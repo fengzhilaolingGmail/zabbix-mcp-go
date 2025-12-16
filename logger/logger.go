@@ -1,4 +1,4 @@
-package main
+package logger
 
 import (
 	"fmt"
@@ -19,7 +19,7 @@ var (
 )
 
 // InitLogger 初始化日志记录器
-func InitLogger(level string) error {
+func InitLogger() error {
 	// 创建logs目录
 	logsDir := "logs"
 	if err := os.MkdirAll(logsDir, 0755); err != nil {
@@ -60,13 +60,6 @@ func InitLogger(level string) error {
 	// 创建控制台写入器
 	consoleWriter := zapcore.Lock(os.Stdout)
 
-	// 解析并设置日志等级（兼容大小写），默认 info
-	lvl, err := zapcore.ParseLevel(strings.ToLower(level))
-	if err != nil {
-		lvl = zap.InfoLevel
-	}
-	atomicLevel = zap.NewAtomicLevelAt(lvl)
-
 	// 创建多写入器（同时写入文件和控制台），使用 atomicLevel 以支持运行时调整
 	core := zapcore.NewTee(
 		zapcore.NewCore(jsonEncoder, fileWriter, atomicLevel),
@@ -85,8 +78,12 @@ func GetLogger() *zap.Logger {
 	return logger
 }
 
-// GetSugar 获取sugar logger实例
-func GetSugar() *zap.SugaredLogger {
+// GetSugaredLogger 获取sugaredLogger实例
+func L() *zap.SugaredLogger {
+	if sugar == nil {
+		// 如果sugar为nil，则初始化logger和sugar
+		InitLogger()
+	}
 	return sugar
 }
 
@@ -123,42 +120,6 @@ func Info(msg string, err error, data interface{}) {
 		sugar.Infow(msg, "error", err.Error(), "data", data)
 	} else {
 		sugar.Infow(msg, "data", data)
-	}
-}
-
-// Error 二次封装：记录 error 级别日志，传入 msg, err, data
-func Error(msg string, err error, data interface{}) {
-	if sugar == nil {
-		return
-	}
-	if err != nil {
-		sugar.Errorw(msg, "error", err.Error(), "data", data)
-	} else {
-		sugar.Errorw(msg, "data", data)
-	}
-}
-
-// Warn 二次封装：记录 warn 级别日志
-func Warn(msg string, err error, data interface{}) {
-	if sugar == nil {
-		return
-	}
-	if err != nil {
-		sugar.Warnw(msg, "error", err.Error(), "data", data)
-	} else {
-		sugar.Warnw(msg, "data", data)
-	}
-}
-
-// Debug 二次封装：记录 debug 级别日志
-func Debug(msg string, err error, data interface{}) {
-	if sugar == nil {
-		return
-	}
-	if err != nil {
-		sugar.Debugw(msg, "error", err.Error(), "data", data)
-	} else {
-		sugar.Debugw(msg, "data", data)
 	}
 }
 

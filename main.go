@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"zabbixMcp/logger"
 
 	"github.com/mark3labs/mcp-go/server"
 )
@@ -17,18 +18,17 @@ func main() {
 	)
 	flag.Parse()
 	// 初始化日志
-	if err := InitLogger(*level); err != nil {
+	if err := logger.InitLogger(); err != nil {
 		panic("初始化日志失败: " + err.Error())
 	}
-	defer Sync()
+	logger.SetLogLevel(*level)
+	defer logger.Sync()
 
-	GetSugar().Info("启动Zabbix MCP服务器")
-
+	logger.L().Info("启动Zabbix MCP服务器")
 	// 加载配置
 	if err := LoadConfig(); err != nil {
-		GetSugar().Fatalf("加载配置失败: %v", err)
+		logger.L().Fatalf("加载配置失败: %v", err)
 	}
-	GetSugar().Info("配置加载成功")
 
 	// for _, instance := range AppConfig.Instances {
 	// 	// 尝试连接Zabbix实例
@@ -40,32 +40,32 @@ func main() {
 		"zabbix-mcp-server",
 		"1.0.0",
 	)
-	GetSugar().Info("MCP服务器创建成功")
+	logger.L().Info("MCP服务器创建成功")
 
 	// 注册工具
 	Registers(s)
-	GetSugar().Info("工具注册完成")
+	logger.L().Info("工具注册完成")
 
 	// 根据参数选择传输方式
 	if *stdioMode {
 		// 启动stdio服务器
-		GetSugar().Info("启动stdio传输方式的MCP服务器...")
+		logger.L().Info("启动stdio传输方式的MCP服务器...")
 		if err := server.ServeStdio(s); err != nil {
-			GetSugar().Fatalf("stdio服务器启动失败: %v", err)
+			logger.L().Fatalf("stdio服务器启动失败: %v", err)
 		}
 	} else if *httpMode {
 		// 启动HTTP/SSE服务器
 		startHTTPServer(s, *port)
 	} else {
 		// 默认同时启动两种方式（在不同的goroutine中）
-		GetSugar().Info("同时启动stdio和HTTP/SSE传输方式的MCP服务器...")
+		logger.L().Info("同时启动stdio和HTTP/SSE传输方式的MCP服务器...")
 
 		// 在后台启动HTTP服务器
 		go startHTTPServer(s, *port)
 
 		// 在主线程启动stdio服务器
 		if err := server.ServeStdio(s); err != nil {
-			GetSugar().Fatalf("stdio服务器启动失败: %v", err)
+			logger.L().Fatalf("stdio服务器启动失败: %v", err)
 		}
 	}
 }
@@ -73,12 +73,12 @@ func main() {
 // startHTTPServer 启动HTTP传输服务器（使用SSE）
 func startHTTPServer(s *server.MCPServer, port int) {
 	addr := fmt.Sprintf(":%d", port)
-	GetSugar().Infof("启动HTTP/SSE传输服务器，监听端口: %d", port)
-	GetSugar().Infof("MCP端点: http://localhost:%d", port)
+	logger.L().Infof("启动HTTP/SSE传输服务器，监听端口: %d", port)
+	logger.L().Infof("MCP端点: http://localhost:%d", port)
 
 	// 使用v0.9.0版本支持的API：创建SSE服务器
 	sseServer := server.NewSSEServer(s)
 	if err := sseServer.Start(addr); err != nil {
-		GetSugar().Fatalf("HTTP/SSE服务器启动失败: %v", err)
+		logger.L().Fatalf("HTTP/SSE服务器启动失败: %v", err)
 	}
 }
