@@ -18,10 +18,10 @@ func main() {
 	)
 	flag.Parse()
 	// 初始化日志
+	logger.SetLogLevel(*level)
 	if err := logger.InitLogger(); err != nil {
 		panic("初始化日志失败: " + err.Error())
 	}
-	logger.SetLogLevel(*level)
 	defer logger.Sync()
 
 	logger.L().Info("启动Zabbix MCP服务器")
