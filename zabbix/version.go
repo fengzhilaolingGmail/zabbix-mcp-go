@@ -2,7 +2,7 @@
  * @Author: fengzhilaoling fengzhilaoling@gmail.com
  * @Date: 2025-12-16 20:54:52
  * @LastEditors: fengzhilaoling
- * @LastEditTime: 2025-12-16 21:24:38
+ * @LastEditTime: 2025-12-17 20:23:59
  * @FilePath: \zabbix-mcp-go\zabbix\version.go
  * @Description: 版本检测相关功能
  * Copyright (c) 2025 by fengzhilaoling@gmail.com, All Rights Reserved.
@@ -108,6 +108,11 @@ func (vd *VersionDetector) parseVersion(versionStr string) (*VersionInfo, error)
 		Patch: patch,
 		Full:  versionStr,
 	}, nil
+}
+
+// ParseVersion 对 parseVersion 的导出包装，便于测试
+func (vd *VersionDetector) ParseVersion(versionStr string) (*VersionInfo, error) {
+	return vd.parseVersion(versionStr)
 }
 
 // getDefaultFeatures 获取默认功能集
