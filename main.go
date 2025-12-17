@@ -2,7 +2,7 @@
  * @Author: fengzhilaoling fengzhilaoling@gmail.com
  * @Date: 2025-12-16 20:14:53
  * @LastEditors: fengzhilaoling
- * @LastEditTime: 2025-12-16 21:09:09
+ * @LastEditTime: 2025-12-17 21:43:01
  * @FilePath: \zabbix-mcp-go\main.go
  * @Description: 文件解释
  * Copyright (c) 2025 by fengzhilaoling@gmail.com, All Rights Reserved.
@@ -12,7 +12,10 @@ package main
 import (
 	"flag"
 	"fmt"
+	"zabbixMcp/handler"
 	lg "zabbixMcp/logger"
+	"zabbixMcp/register"
+	zabbix "zabbixMcp/zabbix"
 
 	"github.com/mark3labs/mcp-go/server"
 )
@@ -39,10 +42,14 @@ func main() {
 		lg.L().Fatalf("加载配置失败: %v", err)
 	}
 
-	// for _, instance := range AppConfig.Instances {
-	// 	// 尝试连接Zabbix实例
-	// 	client := zabbix.NewZabbixClient(instance.URL, instance.User, instance.Pass)
-	// }
+	// 根据配置创建 Zabbix 客户端池
+	pool, err := InitPoolsFromConfig()
+	if err != nil {
+		lg.L().Fatalf("初始化 Zabbix 客户端池失败: %v", err)
+	}
+	if pool != nil {
+		lg.L().Infof("已初始化 Zabbix 客户端池，容量=%d，可用=%d", pool.Capacity(), pool.Available())
+	}
 
 	// 创建MCP服务器
 	s := server.NewMCPServer(
@@ -52,7 +59,7 @@ func main() {
 	lg.L().Info("MCP服务器创建成功")
 
 	// 注册工具
-	Registers(s)
+	register.Registers(s)
 	lg.L().Info("工具注册完成")
 
 	// 根据参数选择传输方式
@@ -90,4 +97,33 @@ func startHTTPServer(s *server.MCPServer, port int) {
 	if err := sseServer.Start(addr); err != nil {
 		lg.L().Fatalf("HTTP/SSE服务器启动失败: %v", err)
 	}
+}
+
+// InitPoolsFromConfig 根据全局 AppConfig 创建并返回一个客户端池，池容量等于实例数量
+func InitPoolsFromConfig() (*zabbix.ClientPool, error) {
+	n := len(AppConfig.Instances)
+	if n == 0 {
+		return nil, nil
+	}
+
+	p := zabbix.NewClientPool(n)
+	for _, inst := range AppConfig.Instances {
+		// 使用默认超时时间 30s，若需要可从配置中扩展
+		cli := zabbix.NewZabbixClient(inst.URL, inst.User, inst.Pass, 30)
+		if inst.AuthType != "" {
+			cli.SetAuthType(inst.AuthType)
+		}
+		if inst.Token != "" {
+			cli.SetAuthToken(inst.Token)
+		}
+		// 设置服务器时区为默认
+		cli.SetServerTimezone("")
+
+		if err := p.Add(cli); err != nil {
+			return nil, fmt.Errorf("将实例 %s 添加到池失败: %w", inst.Name, err)
+		}
+	}
+	// 注入到handler包的全局变量中（使用适配器将 concrete pool 转为 handler.ClientPool）
+	handler.SetClientPool(p)
+	return p, nil
 }

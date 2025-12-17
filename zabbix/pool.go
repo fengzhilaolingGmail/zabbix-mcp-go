@@ -1,6 +1,7 @@
 package zabbix
 
 import (
+	"context"
 	"errors"
 	"sync"
 	"time"
@@ -24,6 +25,9 @@ type ClientPool struct {
 	addedAt  map[*ZabbixClient]time.Time
 	inUse    map[*ZabbixClient]bool
 	capacity int
+	// closed indicates whether the pool has been closed
+	closed    bool
+	closeOnce sync.Once
 }
 
 // ErrPoolFull 当池已满时返回
@@ -63,14 +67,29 @@ func NewClientPoolWithFactory(factory func() *ZabbixClient, capacity int) (*Clie
 
 // Add 将 client 添加到池中，如果已满返回 ErrPoolFull
 func (p *ClientPool) Add(client *ZabbixClient) error {
+	if client == nil {
+		return errors.New("nil client")
+	}
+
 	p.mu.Lock()
 	defer p.mu.Unlock()
+
+	if p.closed {
+		return errors.New("pool is closed")
+	}
 
 	if len(p.all) >= p.capacity {
 		return ErrPoolFull
 	}
 
-	// 记录元信息并放入可用通道
+	// 防止重复添加同一个客户端
+	for _, existing := range p.all {
+		if existing == client {
+			return errors.New("client already added to pool")
+		}
+	}
+
+	// 记录元信息并放入可用通道（此处可能会阻塞直到通道有空间）
 	p.all = append(p.all, client)
 	p.addedAt[client] = time.Now()
 	p.inUse[client] = false
@@ -90,8 +109,8 @@ func (p *ClientPool) Get() (*ZabbixClient, error) {
 	return client, nil
 }
 
-// TryGet 在 timeout 时限内尝试获取客户端，超时返回 ErrPoolEmpty
-func (p *ClientPool) TryGet(timeout time.Duration) (*ZabbixClient, error) {
+// GetWithContext 尝试在给定的 context 内获取可用客户端，context 取消或超时时返回错误
+func (p *ClientPool) GetWithContext(ctx context.Context) (*ZabbixClient, error) {
 	select {
 	case client, ok := <-p.ch:
 		if !ok {
@@ -101,20 +120,54 @@ func (p *ClientPool) TryGet(timeout time.Duration) (*ZabbixClient, error) {
 		p.inUse[client] = true
 		p.mu.Unlock()
 		return client, nil
-	case <-time.After(timeout):
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+}
+
+// TryGet 在 timeout 时限内尝试获取客户端，超时返回 ErrPoolEmpty
+func (p *ClientPool) TryGet(timeout time.Duration) (*ZabbixClient, error) {
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+
+	select {
+	case client, ok := <-p.ch:
+		if !ok {
+			return nil, ErrPoolEmpty
+		}
+		p.mu.Lock()
+		p.inUse[client] = true
+		p.mu.Unlock()
+		return client, nil
+	case <-timer.C:
 		return nil, ErrPoolEmpty
 	}
 }
 
 // Release 将 client 归还到池中；如果池已满返回 ErrPoolFull
 func (p *ClientPool) Release(client *ZabbixClient) error {
-	p.mu.Lock()
-	_, known := p.addedAt[client]
-	p.mu.Unlock()
-	if !known {
-		return errors.New("client does not belong to pool")
+	if client == nil {
+		return errors.New("nil client")
 	}
 
+	p.mu.Lock()
+	if p.closed {
+		p.mu.Unlock()
+		return errors.New("pool is closed")
+	}
+	_, known := p.addedAt[client]
+	if !known {
+		p.mu.Unlock()
+		return errors.New("client does not belong to pool")
+	}
+	// 检查是否已经被归还
+	if inUse, ok := p.inUse[client]; ok && !inUse {
+		p.mu.Unlock()
+		return errors.New("client already released")
+	}
+	p.mu.Unlock()
+
+	// 将 client 放回通道；我们选择阻塞直到成功归还（避免丢失客户端）
 	select {
 	case p.ch <- client:
 		p.mu.Lock()
@@ -122,7 +175,12 @@ func (p *ClientPool) Release(client *ZabbixClient) error {
 		p.mu.Unlock()
 		return nil
 	default:
-		return ErrPoolFull
+		// 如果默认分支发生，意味着通道暂时已满（非常罕见，但我们仍然阻塞以确保归还）
+		p.ch <- client
+		p.mu.Lock()
+		p.inUse[client] = false
+		p.mu.Unlock()
+		return nil
 	}
 }
 
@@ -206,4 +264,15 @@ func (p *ClientPool) HealthCheck(timeout time.Duration) map[string]bool {
 	}
 	wg.Wait()
 	return results
+}
+
+// Close 关闭连接池并释放资源，关闭后不能再 Add 或 Release
+func (p *ClientPool) Close() {
+	p.closeOnce.Do(func() {
+		p.mu.Lock()
+		defer p.mu.Unlock()
+		p.closed = true
+		close(p.ch)
+		// 可在此处对所有客户端执行额外清理（例如释放连接/句柄）
+	})
 }
