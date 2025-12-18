@@ -42,13 +42,14 @@ func main() {
 		lg.L().Fatalf("加载配置失败: %v", err)
 	}
 
-	// 根据配置创建 Zabbix 客户端池
-	pool, err := InitPoolsFromConfig()
+	// 根据配置创建 Zabbix 客户端池（通过接口方式，不直接暴露底层类型）
+	poolHandler, err := InitPoolsFromConfig()
 	if err != nil {
 		lg.L().Fatalf("初始化 Zabbix 客户端池失败: %v", err)
 	}
-	if pool != nil {
-		lg.L().Infof("已初始化 Zabbix 客户端池，容量=%d，可用=%d", pool.Capacity(), pool.Available())
+	if poolHandler != nil {
+		infos := poolHandler.Info()
+		lg.L().Infof("已初始化 Zabbix 客户端池，容量=%d", len(infos))
 	}
 
 	// 创建MCP服务器
@@ -100,30 +101,31 @@ func startHTTPServer(s *server.MCPServer, port int) {
 }
 
 // InitPoolsFromConfig 根据全局 AppConfig 创建并返回一个客户端池，池容量等于实例数量
-func InitPoolsFromConfig() (*zabbix.ClientPool, error) {
+func InitPoolsFromConfig() (zabbix.ZabbixClientHandler, error) {
 	n := len(AppConfig.Instances)
 	if n == 0 {
 		return nil, nil
 	}
 
-	p := zabbix.NewClientPool(n)
+	cfgs := make([]zabbix.ClientConfig, 0, n)
 	for _, inst := range AppConfig.Instances {
-		// 使用默认超时时间 30s，若需要可从配置中扩展
-		cli := zabbix.NewZabbixClient(inst.URL, inst.User, inst.Pass, 30)
-		if inst.AuthType != "" {
-			cli.SetAuthType(inst.AuthType)
-		}
-		if inst.Token != "" {
-			cli.SetAuthToken(inst.Token)
-		}
-		// 设置服务器时区为默认
-		cli.SetServerTimezone("")
-
-		if err := p.Add(cli); err != nil {
-			return nil, fmt.Errorf("将实例 %s 添加到池失败: %w", inst.Name, err)
-		}
+		cfgs = append(cfgs, zabbix.ClientConfig{
+			URL:      inst.URL,
+			User:     inst.User,
+			Pass:     inst.Pass,
+			Token:    inst.Token,
+			AuthType: inst.AuthType,
+			Timeout:  30,
+			ServerTZ: "",
+		})
 	}
-	// 注入到handler包的全局变量中（使用适配器将 concrete pool 转为 handler.ClientPool）
-	handler.SetClientPool(p)
-	return p, nil
+
+	// 使用 zabbix 包提供的工厂，返回接口类型，隐藏内部 ClientPool
+	handlerObj, err := zabbix.NewPoolClientHandlerFromConfigs(cfgs)
+	if err != nil {
+		return nil, err
+	}
+
+	handler.SetClientPool(handlerObj)
+	return handlerObj, nil
 }
