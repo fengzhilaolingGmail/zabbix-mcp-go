@@ -30,17 +30,25 @@ func TestGetHostsHandler(t *testing.T) {
 	if res == nil {
 		t.Fatalf("GetHostsHandler 返回 nil 结果")
 	}
-	// StructuredContent 是 interface{}，先进行类型断言再检查长度
-	switch sc := res.StructuredContent.(type) {
+	// 统一返回结构为 map[string]interface{"ok":bool, "data": ...}
+	sc, ok := res.StructuredContent.(map[string]interface{})
+	if !ok {
+		t.Fatalf("期望 StructuredContent 为 map[string]interface{}, 实际: %T", res.StructuredContent)
+	}
+	data, exists := sc["data"]
+	if !exists {
+		t.Fatalf("返回的封装中缺少 data 字段")
+	}
+	switch d := data.(type) {
 	case []map[string]interface{}:
-		if len(sc) != 1 {
-			t.Fatalf("期望 1 个主机，实际: %d", len(sc))
+		if len(d) != 1 {
+			t.Fatalf("期望 1 个主机，实际: %d", len(d))
 		}
 	case []interface{}:
-		if len(sc) != 1 {
-			t.Fatalf("期望 1 个主机，实际: %d", len(sc))
+		if len(d) != 1 {
+			t.Fatalf("期望 1 个主机，实际: %d", len(d))
 		}
 	default:
-		t.Fatalf("未知的 StructuredContent 类型: %T", res.StructuredContent)
+		t.Fatalf("未知的 data 类型: %T", data)
 	}
 }

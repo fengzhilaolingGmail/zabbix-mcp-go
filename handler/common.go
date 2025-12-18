@@ -10,3 +10,14 @@ var clientPool zabbix.ZabbixClientHandler
 func SetClientPool(p zabbix.ZabbixClientHandler) {
 	clientPool = p
 }
+
+// makeResult 将任意数据包装为统一的 JSON 构造，便于所有 MCP 工具返回一致的格式。
+// 返回结构为: {"ok": true, "data": <payload>}。
+// makeResult 将任意数据包装为统一的 JSON 构造（map[string]interface{}），便于所有 MCP 工具返回一致的格式。
+// 返回结构为: {"ok": true, "data": <payload>}。
+func makeResult(data interface{}) map[string]interface{} {
+	return map[string]interface{}{
+		"ok":   true,
+		"data": data,
+	}
+}

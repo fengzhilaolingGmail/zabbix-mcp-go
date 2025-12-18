@@ -21,7 +21,7 @@ import (
 // GetUsersHandler 通过注入的 ZabbixClientHandler 调用 user.get 并返回结果
 func GetUsersHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	if clientPool == nil {
-		return &mcp.CallToolResult{StructuredContent: []map[string]interface{}{}}, nil
+		return &mcp.CallToolResult{StructuredContent: makeResult([]map[string]interface{}{})}, nil
 	}
 
 	// 使用 server 层处理业务逻辑
@@ -30,5 +30,5 @@ func GetUsersHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToo
 	if err != nil {
 		return nil, fmt.Errorf("调用 user.get 失败: %w", err)
 	}
-	return &mcp.CallToolResult{StructuredContent: users}, nil
+	return &mcp.CallToolResult{StructuredContent: makeResult(users)}, nil
 }
