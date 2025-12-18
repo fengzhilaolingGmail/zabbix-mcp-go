@@ -11,37 +11,29 @@
 package server
 
 import (
+	"context"
 	"fmt"
 
 	"zabbixMcp/zabbix"
 )
 
-// GetUsers 调用底层 ZabbixClientHandler 执行 user.get，并返回解析后的列表
-func GetUsers(client zabbix.ZabbixClientHandler, params map[string]interface{}) ([]map[string]interface{}, error) {
-	if client == nil {
+// GetUsers 调用底层 ClientProvider 执行 user.get，并返回解析后的列表
+func GetUsers(ctx context.Context, provider zabbix.ClientProvider, params map[string]interface{}) ([]map[string]interface{}, error) {
+	if provider == nil {
 		return nil, fmt.Errorf("no zabbix client")
 	}
-
-	res, err := client.Call("user.get", params)
+	lease, err := provider.Acquire(ctx)
 	if err != nil {
 		return nil, err
 	}
-
-	users := make([]map[string]interface{}, 0)
-	switch v := res.(type) {
-	case []interface{}:
-		for _, item := range v {
-			if m, ok := item.(map[string]interface{}); ok {
-				users = append(users, m)
-			}
-		}
-	case []map[string]interface{}:
-		users = v
-	default:
-		if m, ok := v.(map[string]interface{}); ok {
-			users = append(users, m)
-		}
+	var callErr error
+	defer func() { lease.Release(callErr) }()
+	client := lease.Client()
+	adapted := client.AdaptAPIParams("user.get", params)
+	var users []map[string]interface{}
+	callErr = client.Call(ctx, "user.get", adapted, &users)
+	if callErr != nil {
+		return nil, callErr
 	}
-
 	return users, nil
 }

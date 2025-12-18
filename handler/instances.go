@@ -34,7 +34,7 @@ func GetInstancesInfoHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp
 		logger.Info("GetInstancesInfoHandler: clientPool is nil", nil, nil)
 		return mcp.NewToolResultStructuredOnly(makeResult([]zabbix.ClientInfo{})), nil
 	}
-	infos, err := server.GetInstancesInfo(clientPool, instanceName)
+	infos, err := server.GetInstancesInfo(ctx, clientPool, instanceName)
 	if err != nil {
 		logger.L().Errorf("获取实例信息失败: %v", err)
 		return nil, err

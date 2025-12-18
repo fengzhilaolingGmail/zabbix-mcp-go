@@ -10,11 +10,13 @@
 package zabbix
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 )
 
 // Login 登录Zabbix API
-func (c *ZabbixClient) Login() error {
+func (c *ZabbixClient) Login(ctx context.Context) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -26,7 +28,7 @@ func (c *ZabbixClient) Login() error {
 
 		// 尝试调用apiinfo.version来验证连接是否正常
 		// apiinfo.version不需要认证，所以传入空auth参数
-		_, err := c.call("apiinfo.version", map[string]interface{}{}, "")
+		_, err := c.call(ctx, "apiinfo.version", map[string]interface{}{}, "")
 
 		// 恢复AuthToken
 		c.AuthToken = savedToken
@@ -44,14 +46,14 @@ func (c *ZabbixClient) Login() error {
 	}
 
 	// 使用内部调用，传入空auth进行登录
-	response, err := c.callWithAuth("user.login", params, "")
+	response, err := c.callWithAuth(ctx, "user.login", params, "")
 	if err != nil {
 		return fmt.Errorf("登录失败: %w", err)
 	}
 
-	authToken, ok := response.(string)
-	if !ok {
-		return fmt.Errorf("登录响应格式错误")
+	var authToken string
+	if err := json.Unmarshal(response, &authToken); err != nil {
+		return fmt.Errorf("解析登录响应失败: %w", err)
 	}
 
 	c.AuthToken = authToken
@@ -59,7 +61,7 @@ func (c *ZabbixClient) Login() error {
 }
 
 // Logout 登出Zabbix API
-func (c *ZabbixClient) Logout() error {
+func (c *ZabbixClient) Logout(ctx context.Context) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -67,7 +69,7 @@ func (c *ZabbixClient) Logout() error {
 		return nil
 	}
 
-	_, err := c.call("user.logout", nil, c.AuthToken)
+	_, err := c.call(ctx, "user.logout", nil, c.AuthToken)
 	c.AuthToken = ""
 	return err
 }

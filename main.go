@@ -51,7 +51,7 @@ func main() {
 		infos := poolHandler.Info("")
 		lg.L().Infof("已初始化 Zabbix 客户端池，容量=%d", len(infos))
 		for _, info := range infos {
-			lg.L().Infof("客户端: %s 连接方式: %s 连接状态: %v 版本: %v", info.InstenceName, info.AuthType, info.InUse, info.Version)
+			lg.L().Infof("客户端: %s 连接方式: %s 连接状态: %v 版本: %v", info.Instance, info.AuthType, info.InUse, info.Version)
 		}
 	}
 
@@ -104,7 +104,7 @@ func startHTTPServer(s *server.MCPServer, port int) {
 }
 
 // InitPoolsFromConfig 根据全局 AppConfig 创建并返回一个客户端池，池容量等于实例数量
-func InitPoolsFromConfig() (zabbix.ZabbixClientHandler, error) {
+func InitPoolsFromConfig() (zabbix.ClientProvider, error) {
 	n := len(AppConfig.Instances)
 	if n == 0 {
 		return nil, nil
@@ -113,19 +113,19 @@ func InitPoolsFromConfig() (zabbix.ZabbixClientHandler, error) {
 	cfgs := make([]zabbix.ClientConfig, 0, n)
 	for _, inst := range AppConfig.Instances {
 		cfgs = append(cfgs, zabbix.ClientConfig{
-			InstenceName: inst.Name,
-			URL:          inst.URL,
-			User:         inst.User,
-			Pass:         inst.Pass,
-			Token:        inst.Token,
-			AuthType:     inst.AuthType,
-			Timeout:      30,
-			ServerTZ:     "",
+			Instance: inst.Name,
+			URL:      inst.URL,
+			User:     inst.User,
+			Pass:     inst.Pass,
+			Token:    inst.Token,
+			AuthType: inst.AuthType,
+			Timeout:  30,
+			ServerTZ: "",
 		})
 	}
 
 	// 使用 zabbix 包提供的工厂，返回接口类型，隐藏内部 ClientPool
-	handlerObj, err := zabbix.NewPoolClientHandlerFromConfigs(cfgs)
+	handlerObj, err := zabbix.NewClientProviderFromConfigs(cfgs)
 	if err != nil {
 		return nil, err
 	}

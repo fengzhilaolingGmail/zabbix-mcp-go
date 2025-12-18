@@ -18,7 +18,7 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
-// GetUsersHandler 通过注入的 ZabbixClientHandler 调用 user.get 并返回结果
+// GetUsersHandler 通过注入的 ClientProvider 调用 user.get 并返回结果
 func GetUsersHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	if clientPool == nil {
 		return mcp.NewToolResultStructuredOnly(makeResult([]map[string]interface{}{})), nil
@@ -26,7 +26,7 @@ func GetUsersHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToo
 
 	// 使用 server 层处理业务逻辑
 	params := map[string]interface{}{"output": "extend"}
-	users, err := server.GetUsers(clientPool, params)
+	users, err := server.GetUsers(ctx, clientPool, params)
 	if err != nil {
 		return nil, fmt.Errorf("调用 user.get 失败: %w", err)
 	}

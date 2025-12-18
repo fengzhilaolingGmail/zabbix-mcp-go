@@ -10,6 +10,8 @@
 package zabbix
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -35,7 +37,10 @@ func NewVersionDetector(client *ZabbixClient) *VersionDetector {
 }
 
 // DetectVersion 检测Zabbix版本
-func (vd *VersionDetector) DetectVersion() (*VersionInfo, error) {
+func (vd *VersionDetector) DetectVersion(ctx context.Context) (*VersionInfo, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	// 先尝试从 client 缓存读取
 	if vd.client != nil {
 		if cached := vd.client.GetCachedVersion(); cached != nil {
@@ -45,17 +50,17 @@ func (vd *VersionDetector) DetectVersion() (*VersionInfo, error) {
 
 	// 获取API版本信息 - 使用内部调用避免循环依赖
 	// Zabbix API要求params为空数组[]而不是nil
-	result, err := vd.client.callWithAuth("apiinfo.version", []interface{}{}, "") // 使用旧方式获取API版本信息
+	result, err := vd.client.callWithAuth(ctx, "apiinfo.version", []interface{}{}, "") // 使用旧方式获取API版本信息
 	if err != nil {
 		logger.L().Warnf("获取API版本失败: %v, 尝试新方法", err)
-		result, err = vd.client.callWithHeaderAuth("apiinfo.version", nil, "") // 使用新方式获取API版本信息
+		result, err = vd.client.callWithHeaderAuth(ctx, "apiinfo.version", nil, "") // 使用新方式获取API版本信息
 		if err != nil {
 			return nil, fmt.Errorf("获取API版本失败: %w", err)
 		}
 	}
-	apiVersion, ok := result.(string)
-	if !ok {
-		return nil, fmt.Errorf("API版本响应格式错误")
+	var apiVersion string
+	if err := json.Unmarshal(result, &apiVersion); err != nil {
+		return nil, fmt.Errorf("API版本响应格式错误: %w", err)
 	}
 
 	// 解析版本号
@@ -128,7 +133,7 @@ func (vd *VersionDetector) getDefaultFeatures() map[string]bool {
 
 // 在 version.go 中添加更详细的版本特性映射
 func (vd *VersionDetector) GetDetailedVersionFeatures() map[string]interface{} {
-	version, err := vd.DetectVersion()
+	version, err := vd.DetectVersion(context.Background())
 	if err != nil {
 		// 将 map[string]bool 转换为 map[string]interface{}
 		defaultFeatures := vd.getDefaultFeatures()
@@ -163,7 +168,7 @@ func (vd *VersionDetector) GetDetailedVersionFeatures() map[string]interface{} {
 
 // AdaptAPIParams 根据版本适配API参数
 func (vd *VersionDetector) AdaptAPIParams(method string, params map[string]interface{}) map[string]interface{} {
-	version, err := vd.DetectVersion()
+	version, err := vd.DetectVersion(context.Background())
 	if err != nil {
 		return params
 	}

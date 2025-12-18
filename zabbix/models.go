@@ -10,7 +10,10 @@
 
 package zabbix
 
-import "fmt"
+import (
+	"encoding/json"
+	"fmt"
+)
 
 // JSONRPCRequest JSON-RPC请求结构
 type JSONRPCRequest struct {
@@ -22,10 +25,10 @@ type JSONRPCRequest struct {
 }
 
 type JSONRPCResponse struct {
-	JSONRPC string      `json:"jsonrpc"` // JSON-RPC 协议的版本号，本例中为 2.0
-	Result  interface{} `json:"result"`  // 方法调用的结果，可以是任何类型
-	Error   *RPCError   `json:"error"`   // 如果调用失败，则包含错误信息
-	ID      int         `json:"id"`      // 请求的唯一标识符，用于响应请求
+	JSONRPC string          `json:"jsonrpc"` // JSON-RPC 协议的版本号，本例中为 2.0
+	Result  json.RawMessage `json:"result"`  // 方法调用的结果原始 JSON，便于上层自行解码
+	Error   *RPCError       `json:"error"`   // 如果调用失败，则包含错误信息
+	ID      int             `json:"id"`      // 请求的唯一标识符，用于响应请求
 }
 
 // RPCError RPC错误结构

@@ -1,6 +1,7 @@
 package zabbix
 
 import (
+	"context"
 	"errors"
 	"sync"
 	"time"
@@ -8,34 +9,41 @@ import (
 
 // ClientInfo 描述连接池中客户端的详细信息
 type ClientInfo struct {
-	InstenceName string    `json:"instance_name"`
-	URL          string    `json:"url"`
-	User         string    `json:"user"`
-	AuthType     string    `json:"auth_type"`
-	ServerTZ     string    `json:"server_tz"`
-	InUse        bool      `json:"in_use"`
-	AddedAt      time.Time `json:"added_at"`
-	Version      string    `json:"version"`
+	Instance string    `json:"instance"`
+	URL      string    `json:"url"`
+	User     string    `json:"user"`
+	AuthType string    `json:"auth_type"`
+	ServerTZ string    `json:"server_tz"`
+	InUse    bool      `json:"in_use"`
+	AddedAt  time.Time `json:"added_at"`
+	Version  string    `json:"version"`
+}
+
+var (
+	// ErrPoolFull 当池已满时返回
+	ErrPoolFull = errors.New("client pool is full")
+	// ErrPoolEmpty 当池为空且无法获取时返回
+	ErrPoolEmpty = errors.New("client pool is empty")
+	// ErrPoolClosed 指示池已经关闭
+	ErrPoolClosed = errors.New("client pool is closed")
+)
+
+type clientMeta struct {
+	addedAt   time.Time
+	inUse     bool
+	lastError error
 }
 
 // ClientPool 管理一组可复用的 ZabbixClient
 type ClientPool struct {
-	ch       chan *ZabbixClient
-	mu       sync.Mutex
-	all      []*ZabbixClient
-	addedAt  map[*ZabbixClient]time.Time
-	inUse    map[*ZabbixClient]bool
-	capacity int
-	// closed indicates whether the pool has been closed
+	idle      chan *ZabbixClient
+	mu        sync.Mutex
+	order     []*ZabbixClient
+	meta      map[*ZabbixClient]*clientMeta
+	capacity  int
 	closed    bool
 	closeOnce sync.Once
 }
-
-// ErrPoolFull 当池已满时返回
-var ErrPoolFull = errors.New("client pool is full")
-
-// ErrPoolEmpty 当池为空且无法获取时返回
-var ErrPoolEmpty = errors.New("client pool is empty")
 
 // NewClientPool 创建一个容量为 capacity 的连接池（capacity 必须 >=1）
 func NewClientPool(capacity int) *ClientPool {
@@ -43,19 +51,21 @@ func NewClientPool(capacity int) *ClientPool {
 		capacity = 1
 	}
 	return &ClientPool{
-		ch:       make(chan *ZabbixClient, capacity),
-		all:      make([]*ZabbixClient, 0, capacity),
-		addedAt:  make(map[*ZabbixClient]time.Time),
-		inUse:    make(map[*ZabbixClient]bool),
+		idle:     make(chan *ZabbixClient, capacity),
+		order:    make([]*ZabbixClient, 0, capacity),
+		meta:     make(map[*ZabbixClient]*clientMeta),
 		capacity: capacity,
 	}
 }
 
 // NewClientPoolWithFactory 使用工厂函数初始化并填充池
-func NewClientPoolWithFactory(factory func() *ZabbixClient, capacity int) (*ClientPool, error) {
+func NewClientPoolWithFactory(factory func() (*ZabbixClient, error), capacity int) (*ClientPool, error) {
 	p := NewClientPool(capacity)
 	for i := 0; i < capacity; i++ {
-		c := factory()
+		c, err := factory()
+		if err != nil {
+			return nil, err
+		}
 		if c == nil {
 			return nil, errors.New("factory returned nil client")
 		}
@@ -74,95 +84,100 @@ func (p *ClientPool) Add(client *ZabbixClient) error {
 
 	p.mu.Lock()
 	defer p.mu.Unlock()
-
 	if p.closed {
-		return errors.New("pool is closed")
+		return ErrPoolClosed
 	}
-
-	if len(p.all) >= p.capacity {
+	if len(p.order) >= p.capacity {
 		return ErrPoolFull
 	}
-
-	// 防止重复添加同一个客户端
-	for _, existing := range p.all {
+	for _, existing := range p.order {
 		if existing == client {
 			return errors.New("client already added to pool")
 		}
 	}
-
-	// 记录元信息并放入可用通道（此处可能会阻塞直到通道有空间）
-	p.all = append(p.all, client)
-	p.addedAt[client] = time.Now()
-	// 不应盲目将 inUse 设为 false；应根据客户端的登录状态初始化。
-	// 如果客户端已持有有效的 AuthToken（例如 token 认证）则视为已登录。
-	loggedIn := false
-	if client != nil {
-		if client.GetAuthToken() != "" {
-			loggedIn = true
-		}
-	}
-	p.inUse[client] = loggedIn
-	p.ch <- client
+	p.order = append(p.order, client)
+	p.meta[client] = &clientMeta{addedAt: time.Now()}
+	p.idle <- client
 	return nil
 }
 
-// Get 从池中获取一个客户端（阻塞直到有可用的客户端或池被破坏）
-func (p *ClientPool) Get() (*ZabbixClient, error) {
-	client, ok := <-p.ch
-	if !ok {
-		return nil, ErrPoolEmpty
+// Acquire 获取一个租借句柄，实现 ClientProvider 接口
+func (p *ClientPool) Acquire(ctx context.Context) (ClientLease, error) {
+	if ctx == nil {
+		ctx = context.Background()
 	}
-	p.mu.Lock()
-	p.inUse[client] = true
-	p.mu.Unlock()
-	return client, nil
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case client, ok := <-p.idle:
+		if !ok {
+			return nil, ErrPoolClosed
+		}
+		p.markInUse(client, true)
+		return newPoolLease(p, client), nil
+	}
 }
 
-// Release 将 client 归还到池中；如果池已满返回 ErrPoolFull
-func (p *ClientPool) Release(client *ZabbixClient) error {
-	if client == nil {
-		return errors.New("nil client")
-	}
-
+func (p *ClientPool) markInUse(client *ZabbixClient, inUse bool) {
 	p.mu.Lock()
-	if p.closed {
-		p.mu.Unlock()
-		return errors.New("pool is closed")
+	defer p.mu.Unlock()
+	if meta, ok := p.meta[client]; ok {
+		meta.inUse = inUse
 	}
-	_, known := p.addedAt[client]
-	if !known {
-		p.mu.Unlock()
-		return errors.New("client does not belong to pool")
-	}
-	// 检查是否已经被归还
-	if inUse, ok := p.inUse[client]; ok && !inUse {
-		p.mu.Unlock()
-		return errors.New("client already released")
-	}
-	p.mu.Unlock()
+}
 
-	// 将 client 放回通道；我们选择阻塞直到成功归还（避免丢失客户端）
-	select {
-	case p.ch <- client:
-		p.mu.Lock()
-		p.inUse[client] = false
-		p.mu.Unlock()
-		return nil
-	default:
-		// 如果默认分支发生，意味着通道暂时已满（非常罕见，但我们仍然阻塞以确保归还）
-		p.ch <- client
-		p.mu.Lock()
-		p.inUse[client] = false
-		p.mu.Unlock()
-		return nil
+func (p *ClientPool) releaseClient(client *ZabbixClient, lastErr error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.closed {
+		return
 	}
+	if meta, ok := p.meta[client]; ok {
+		meta.inUse = false
+		meta.lastError = lastErr
+	}
+	select {
+	case p.idle <- client:
+	default:
+		// Should not happen; fallback to blocking send to avoid leak
+		p.idle <- client
+	}
+}
+
+// Info 返回每个实例的详细信息
+func (p *ClientPool) Info(Instance string) []ClientInfo {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	out := make([]ClientInfo, 0, len(p.order))
+	for _, c := range p.order {
+		if Instance != "" && c.Instance != Instance {
+			continue
+		}
+		meta := p.meta[c]
+		version := ""
+		if v := c.GetCachedVersion(); v != nil {
+			version = v.Full
+		}
+		info := ClientInfo{
+			Instance: c.Instance,
+			URL:      c.URL,
+			User:     c.User,
+			AuthType: c.AuthType,
+			ServerTZ: c.ServerTZ,
+			InUse:    meta != nil && meta.inUse,
+			AddedAt:  meta.addedAt,
+			Version:  version,
+		}
+		out = append(out, info)
+	}
+	return out
 }
 
 // Total 返回池中注册的客户端总数（capacity 内实际添加的）
 func (p *ClientPool) Total() int {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	return len(p.all)
+	return len(p.order)
 }
 
 // Capacity 返回池容量
@@ -170,91 +185,78 @@ func (p *ClientPool) Capacity() int {
 	return p.capacity
 }
 
-// 返回每个实例的详细信息
-func (p *ClientPool) Info(instenceName string) []ClientInfo {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	// 如果 instenceName 为空，返回所有实例；否则只返回名称匹配的实例
-	out := make([]ClientInfo, 0, len(p.all))
-	for _, c := range p.all {
-		if instenceName != "" && c.InstenceName != instenceName {
-			// 非空参数且不匹配，跳过
-			continue
-		}
-		inuse := false
-		if v, ok := p.inUse[c]; ok {
-			inuse = v
-		}
-		added := p.addedAt[c]
-
-		// Safely obtain cached version (may be nil)
-		version := ""
-		if v := c.GetCachedVersion(); v != nil {
-			version = v.Full
-		}
-		info := ClientInfo{
-			InstenceName: c.InstenceName,
-			URL:          c.URL,
-			User:         c.User,
-			AuthType:     c.AuthType,
-			ServerTZ:     c.ServerTZ,
-			InUse:        inuse,
-			AddedAt:      added,
-			Version:      version,
-		}
-		out = append(out, info)
+// HealthCheck 对池中所有空闲实例执行简单检查
+func (p *ClientPool) HealthCheck(ctx context.Context, timeout time.Duration) map[string]bool {
+	if ctx == nil {
+		ctx = context.Background()
 	}
-	return out
-}
-
-// HealthCheck 对池中所有实例并发执行简单检查（调用 apiinfo.version），返回每个实例的健康状态
-// 注意：该方法会发起网络请求，调用方需考虑频率与超时
-func (p *ClientPool) HealthCheck(timeout time.Duration) map[string]bool {
-	p.mu.Lock()
-	clients := make([]*ZabbixClient, len(p.all))
-	copy(clients, p.all)
-	p.mu.Unlock()
-
 	results := make(map[string]bool)
 	var wg sync.WaitGroup
-	mu := sync.Mutex{}
+	var resMu sync.Mutex
 
-	for _, c := range clients {
+	for {
+		lease, ok := p.tryAcquire()
+		if !ok {
+			break
+		}
 		wg.Add(1)
-		go func(cli *ZabbixClient) {
+		go func(l *poolLease) {
 			defer wg.Done()
-			// Try to call apiinfo.version with a timeout goroutine
-			ok := false
-			done := make(chan struct{})
-			go func() {
-				_, err := cli.Call("apiinfo.version", []interface{}{})
-				if err == nil {
-					ok = true
-				}
-				close(done)
-			}()
-			select {
-			case <-done:
-				// finished
-			case <-time.After(timeout):
-				ok = false
-			}
-			mu.Lock()
-			results[cli.URL] = ok
-			mu.Unlock()
-		}(c)
+			checkCtx, cancel := context.WithTimeout(ctx, timeout)
+			defer cancel()
+			err := l.Client().Call(checkCtx, "apiinfo.version", []interface{}{}, nil)
+			resMu.Lock()
+			results[l.client.URL] = err == nil
+			resMu.Unlock()
+			l.Release(err)
+		}(lease)
 	}
 	wg.Wait()
 	return results
 }
 
-// Close 关闭连接池并释放资源，关闭后不能再 Add 或 Release
+func (p *ClientPool) tryAcquire() (*poolLease, bool) {
+	select {
+	case client, ok := <-p.idle:
+		if !ok {
+			return nil, false
+		}
+		p.markInUse(client, true)
+		return newPoolLease(p, client), true
+	default:
+		return nil, false
+	}
+}
+
+// Close 关闭连接池并释放资源，关闭后不能再 Add 或 Acquire
 func (p *ClientPool) Close() {
 	p.closeOnce.Do(func() {
 		p.mu.Lock()
-		defer p.mu.Unlock()
 		p.closed = true
-		close(p.ch) // 关闭通道以通知所有等待的 Get 操作
+		close(p.idle)
+		p.mu.Unlock()
+	})
+}
+
+// 确保 ClientPool 实现 ClientProvider
+var _ ClientProvider = (*ClientPool)(nil)
+
+type poolLease struct {
+	pool   *ClientPool
+	client *ZabbixClient
+	once   sync.Once
+}
+
+func newPoolLease(pool *ClientPool, client *ZabbixClient) *poolLease {
+	return &poolLease{pool: pool, client: client}
+}
+
+func (l *poolLease) Client() APIClient {
+	return l.client
+}
+
+func (l *poolLease) Release(err error) {
+	l.once.Do(func() {
+		l.pool.releaseClient(l.client, err)
 	})
 }

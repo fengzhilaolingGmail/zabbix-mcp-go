@@ -2,7 +2,7 @@
  * @Author: fengzhilaoling fengzhilaoling@gmail.com
  * @Date: 2025-12-16 20:19:03
  * @LastEditors: fengzhilaoling
- * @LastEditTime: 2025-12-18 16:39:33
+ * @LastEditTime: 2025-12-18 21:39:06
  * @FilePath: \zabbix-mcp-go\zabbix\client.go
  * @Description: Zabbix客户端相关功能
  * Copyright (c) 2025 by fengzhilaoling@gmail.com, All Rights Reserved.
@@ -11,65 +11,78 @@ package zabbix
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"strings"
 	"sync"
 	"time"
+	"zabbixMcp/logger"
 )
 
 type ZabbixClient struct {
-	InstenceName string
-	URL          string
-	User         string
-	Pass         string
-	AuthToken    string
-	AuthType     string // "password" 或 "token"
-	ServerTZ     string
-	HTTPClient   *http.Client
-	mu           sync.Mutex
+	Instance         string
+	URL              string
+	apiURL           string
+	User             string
+	Pass             string
+	AuthToken        string
+	AuthType         string // "password" 或 "token"
+	ServerTZ         string
+	HTTPClient       *http.Client
+	mu               sync.Mutex
+	preferHeaderAuth bool
 	// 缓存检测到的版本（防止频繁请求）
 	cachedVersion *VersionInfo
 	cacheLock     sync.RWMutex
 }
 
 // NewZabbixClient 创建新的Zabbix客户端
-func NewZabbixClient(name, url, user, pass string, timeout int) *ZabbixClient {
+func NewZabbixClient(name, rawURL, user, pass string, timeout int) (*ZabbixClient, error) {
 	var HTTPTimeout time.Duration = 120 * time.Second // 默认超时时间为120秒
 	if timeout > 0 {
 		HTTPTimeout = time.Duration(timeout) * time.Second
 	}
+	apiURL, err := buildAPIEndpoint(rawURL)
+	if err != nil {
+		return nil, err
+	}
 	return &ZabbixClient{
-		InstenceName: name,
-		URL:          url,
-		User:         user,
-		Pass:         pass,
-		ServerTZ:     "",
-		AuthType:     "password", // 默认为密码认证
+		Instance: name,
+		URL:      rawURL,
+		apiURL:   apiURL,
+		User:     user,
+		Pass:     pass,
+		ServerTZ: "",
+		AuthType: "password", // 默认为密码认证
 		HTTPClient: &http.Client{
 			Timeout: HTTPTimeout,
 		},
-	}
+	}, nil
 }
 
 // ClientConfig 是用于创建 ZabbixClient 的工厂配置结构体，便于在一处集中管理实例化逻辑
 type ClientConfig struct {
-	InstenceName string
-	URL          string
-	User         string
-	Pass         string
-	Token        string
-	AuthType     string // "password" 或 "token"
-	Timeout      int    // HTTP 超时（秒），0 表示使用默认值
-	ServerTZ     string // 可选，设置服务器时区，空则保持默认
+	Instance string
+	URL      string
+	User     string
+	Pass     string
+	Token    string
+	AuthType string // "password" 或 "token"
+	Timeout  int    // HTTP 超时（秒），0 表示使用默认值
+	ServerTZ string // 可选，设置服务器时区，空则保持默认
 }
 
 // NewZabbixClientFromConfig 根据 ClientConfig 创建并初始化一个 *ZabbixClient。
 // 这样可以把实例化逻辑集中到工厂里，调用方（例如 main）只需传入配置即可；同时便于测试替换。
-func NewZabbixClientFromConfig(cfg ClientConfig) *ZabbixClient {
-	cli := NewZabbixClient(cfg.InstenceName, cfg.URL, cfg.User, cfg.Pass, cfg.Timeout)
+func NewZabbixClientFromConfig(cfg ClientConfig) (*ZabbixClient, error) {
+	cli, err := NewZabbixClient(cfg.Instance, cfg.URL, cfg.User, cfg.Pass, cfg.Timeout)
+	if err != nil {
+		return nil, err
+	}
 	if cfg.AuthType != "" {
 		cli.SetAuthType(cfg.AuthType)
 	}
@@ -78,8 +91,16 @@ func NewZabbixClientFromConfig(cfg ClientConfig) *ZabbixClient {
 	}
 	// 时区使用配置中的值，如果为空则使用本地时区
 	cli.SetServerTimezone(cfg.ServerTZ)
-	cli.Login() // 登录以获取认证令牌
-	return cli
+	if err := cli.Login(context.Background()); err != nil {
+		return nil, err
+	}
+	if ver, err := NewVersionDetector(cli).DetectVersion(context.Background()); err == nil {
+		cli.preferHeaderAuth = ver.Major >= 7
+	} else {
+		// 版本探测失败不阻塞流程，但记录日志由调用方负责
+		logger.L().Warnf("探测 %s 版本失败: %v", cli.Instance, err)
+	}
+	return cli, nil
 }
 
 // SetServerTimezone 设置服务器时区
@@ -120,25 +141,69 @@ func (c *ZabbixClient) ClearCachedVersion() {
 	c.cachedVersion = nil
 }
 
-func (c *ZabbixClient) call(method string, params interface{}, auth string) (interface{}, error) {
-	// 检测Zabbix版本以确定认证方式
-	version, err := NewVersionDetector(c).DetectVersion()
+func (c *ZabbixClient) Call(ctx context.Context, method string, params interface{}, result interface{}) error {
+	authToken, err := c.ensureAuthToken(ctx)
 	if err != nil {
-		// 如果版本检测失败，使用传统方式
-		return c.callWithAuth(method, params, auth)
+		return err
 	}
 
-	// Zabbix 7.0+ 不再使用auth参数，改用HTTP头部认证
-	if version.Major >= 7 {
-		return c.callWithHeaderAuth(method, params, auth)
+	payload, err := c.call(ctx, method, params, authToken)
+	if err != nil {
+		if isAuthError(err) && c.getAuthType() != "token" {
+			if err := c.Login(ctx); err != nil {
+				return err
+			}
+			if payload, err = c.call(ctx, method, params, c.getAuthToken()); err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
 	}
 
-	// 旧版本使用传统的auth参数
-	return c.callWithAuth(method, params, auth)
+	if result == nil {
+		return nil
+	}
+	return json.Unmarshal(payload, result)
 }
 
-// 旧版本使用auth参数进行认证
-func (c *ZabbixClient) callWithAuth(method string, params interface{}, auth string) (interface{}, error) {
+func (c *ZabbixClient) ensureAuthToken(ctx context.Context) (string, error) {
+	token := c.getAuthToken()
+	if token == "" && c.getAuthType() != "token" {
+		if err := c.Login(ctx); err != nil {
+			return "", err
+		}
+		token = c.getAuthToken()
+	}
+	return token, nil
+}
+
+func (c *ZabbixClient) call(ctx context.Context, method string, params interface{}, auth string) (json.RawMessage, error) {
+	primaryHeader := c.prefersHeaderAuth()
+	var first func(context.Context, string, interface{}, string) (json.RawMessage, error)
+	var second func(context.Context, string, interface{}, string) (json.RawMessage, error)
+	if primaryHeader {
+		first = c.callWithHeaderAuth
+		second = c.callWithAuth
+	} else {
+		first = c.callWithAuth
+		second = c.callWithHeaderAuth
+	}
+
+	if payload, err := first(ctx, method, params, auth); err == nil {
+		return payload, nil
+	} else if _, ok := err.(*RPCError); ok && second != nil {
+		if altPayload, altErr := second(ctx, method, params, auth); altErr == nil {
+			c.setHeaderPreference(!primaryHeader)
+			return altPayload, nil
+		}
+		return nil, err
+	} else {
+		return nil, err
+	}
+}
+
+func (c *ZabbixClient) callWithAuth(ctx context.Context, method string, params interface{}, auth string) (json.RawMessage, error) {
 	request := JSONRPCRequest{
 		JSONRPC: "2.0",
 		Method:  method,
@@ -152,46 +217,21 @@ func (c *ZabbixClient) callWithAuth(method string, params interface{}, auth stri
 		return nil, fmt.Errorf("序列化请求失败: %w", err)
 	}
 
-	// 构建完整的API URL，如果URL中没有包含api_jsonrpc.php则自动添加
-	if !strings.Contains(c.URL, "api_jsonrpc.php") {
-		// 移除末尾的斜杠（如果有）
-		c.URL = strings.TrimRight(c.URL, "/")
-		// 添加API路径
-		c.URL = c.URL + "/api_jsonrpc.php"
-	}
-
-	resp, err := c.HTTPClient.Post(c.URL, "application/json", bytes.NewBuffer(requestData))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.apiURL, bytes.NewReader(requestData))
 	if err != nil {
-		return nil, fmt.Errorf("HTTP请求失败: %w", err)
+		return nil, fmt.Errorf("创建HTTP请求失败: %w", err)
 	}
-	defer resp.Body.Close()
+	req.Header.Set("Content-Type", "application/json")
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("读取响应失败: %w", err)
-	}
-
-	var response JSONRPCResponse
-	if err := json.Unmarshal(body, &response); err != nil {
-		return nil, fmt.Errorf("解析响应失败: %w", err)
-	}
-
-	if response.Error != nil {
-		return nil, response.Error
-	}
-
-	return response.Result, nil
+	return c.doRequest(req)
 }
 
-// 使用HTTP头部认证
-func (c *ZabbixClient) callWithHeaderAuth(method string, params interface{}, auth string) (interface{}, error) {
-	// Zabbix 7.0+ 不在请求体中包含auth参数
+func (c *ZabbixClient) callWithHeaderAuth(ctx context.Context, method string, params interface{}, auth string) (json.RawMessage, error) {
 	request := JSONRPCRequest{
 		JSONRPC: "2.0",
 		Method:  method,
 		Params:  params,
 		ID:      1,
-		// Auth字段为空，不包含在JSON中
 	}
 
 	requestData, err := json.Marshal(request)
@@ -199,29 +239,19 @@ func (c *ZabbixClient) callWithHeaderAuth(method string, params interface{}, aut
 		return nil, fmt.Errorf("序列化请求失败: %w", err)
 	}
 
-	// 构建完整的API URL，如果URL中没有包含api_jsonrpc.php则自动添加
-	if !strings.Contains(c.URL, "api_jsonrpc.php") {
-		// 移除末尾的斜杠（如果有）
-		c.URL = strings.TrimRight(c.URL, "/")
-		// 添加API路径
-		c.URL = c.URL + "/api_jsonrpc.php"
-	}
-
-	// 创建HTTP请求
-	req, err := http.NewRequest("POST", c.URL, bytes.NewBuffer(requestData))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.apiURL, bytes.NewReader(requestData))
 	if err != nil {
 		return nil, fmt.Errorf("创建HTTP请求失败: %w", err)
 	}
-
-	// 设置请求头
 	req.Header.Set("Content-Type", "application/json")
-
-	// Zabbix 7.0+ 使用Authorization头部进行认证
 	if auth != "" {
 		req.Header.Set("Authorization", "Bearer "+auth)
 	}
 
-	// 执行请求
+	return c.doRequest(req)
+}
+
+func (c *ZabbixClient) doRequest(req *http.Request) (json.RawMessage, error) {
 	resp, err := c.HTTPClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("HTTP请求失败: %w", err)
@@ -241,38 +271,61 @@ func (c *ZabbixClient) callWithHeaderAuth(method string, params interface{}, aut
 	if response.Error != nil {
 		return nil, response.Error
 	}
-
+	if response.Result == nil {
+		return json.RawMessage("null"), nil
+	}
 	return response.Result, nil
 }
 
-func (c *ZabbixClient) Call(method string, params interface{}) (interface{}, error) {
+func (c *ZabbixClient) prefersHeaderAuth() bool {
 	c.mu.Lock()
-	authToken := c.AuthToken
+	defer c.mu.Unlock()
+	return c.preferHeaderAuth
+}
+
+func (c *ZabbixClient) setHeaderPreference(header bool) {
+	c.mu.Lock()
+	c.preferHeaderAuth = header
 	c.mu.Unlock()
+}
 
-	if authToken == "" && c.AuthType != "token" {
-		if err := c.Login(); err != nil {
-			return nil, err
-		}
-		c.mu.Lock()
-		authToken = c.AuthToken
-		c.mu.Unlock()
+func (c *ZabbixClient) getAuthToken() string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.AuthToken
+}
+
+func (c *ZabbixClient) getAuthType() string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.AuthType
+}
+
+func isAuthError(err error) bool {
+	if err == nil {
+		return false
 	}
-
-	result, err := c.call(method, params, authToken)
-	if err != nil {
-		// 如果认证失败，尝试重新登录（仅对密码认证）
-		if rpcErr, ok := err.(*RPCError); ok && rpcErr.Code == -32602 && c.AuthType != "token" {
-			if err := c.Login(); err != nil {
-				return nil, err
-			}
-			c.mu.Lock()
-			authToken = c.AuthToken
-			c.mu.Unlock()
-			return c.call(method, params, authToken)
-		}
-		return nil, err
+	if rpcErr, ok := err.(*RPCError); ok {
+		return rpcErr.Code == -32602 || rpcErr.Code == -32500
 	}
+	return false
+}
 
-	return result, nil
+func (c *ZabbixClient) GetDetailedVersionFeatures() map[string]interface{} {
+	return NewVersionDetector(c).GetDetailedVersionFeatures()
+}
+
+func (c *ZabbixClient) AdaptAPIParams(method string, params map[string]interface{}) map[string]interface{} {
+	return NewVersionDetector(c).AdaptAPIParams(method, params)
+}
+
+func buildAPIEndpoint(raw string) (string, error) {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return "", errors.New("zabbix url 不能为空")
+	}
+	if strings.Contains(trimmed, "api_jsonrpc.php") {
+		return trimmed, nil
+	}
+	return strings.TrimRight(trimmed, "/") + "/api_jsonrpc.php", nil
 }
