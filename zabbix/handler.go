@@ -1,6 +1,11 @@
 package zabbix
 
-import "time"
+import (
+	"sync"
+	"time"
+
+	"zabbixMcp/logger"
+)
 
 // ZabbixClientHandler 是对外可见的抽象，隐藏内部具体的 ZabbixClient 或 ClientPool 实现
 type ZabbixClientHandler interface {
@@ -44,6 +49,23 @@ func NewPoolClientHandlerFromConfigs(cfgs []ClientConfig) (ZabbixClientHandler, 
 			return nil, err
 		}
 	}
+	// 预热每个客户端的版本缓存，避免延迟检测导致只有部分实例被探测到的情况。
+	var wg sync.WaitGroup
+	for _, c := range p.all {
+		if c == nil {
+			continue
+		}
+		wg.Add(1)
+		go func(cli *ZabbixClient) {
+			defer wg.Done()
+			if ver, err := NewVersionDetector(cli).DetectVersion(); err == nil {
+				logger.L().Info(cli.InstenceName + " API版本信息: " + ver.Full)
+			} else {
+				logger.L().Error("版本检测失败: " + err.Error())
+			}
+		}(c)
+	}
+	wg.Wait()
 	return &poolClientHandler{pool: p}, nil
 }
 

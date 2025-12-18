@@ -2,7 +2,7 @@
  * @Author: fengzhilaoling fengzhilaoling@gmail.com
  * @Date: 2025-12-16 20:54:52
  * @LastEditors: fengzhilaoling
- * @LastEditTime: 2025-12-17 20:23:59
+ * @LastEditTime: 2025-12-18 16:49:22
  * @FilePath: \zabbix-mcp-go\zabbix\version.go
  * @Description: 版本检测相关功能
  * Copyright (c) 2025 by fengzhilaoling@gmail.com, All Rights Reserved.

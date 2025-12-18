@@ -2,7 +2,7 @@
  * @Author: fengzhilaoling fengzhilaoling@gmail.com
  * @Date: 2025-12-17 20:56:38
  * @LastEditors: fengzhilaoling
- * @LastEditTime: 2025-12-18 12:43:58
+ * @LastEditTime: 2025-12-18 13:05:20
  * @FilePath: \zabbix-mcp-go\handler\pool_handler.go
  * @Description: 文件解释
  * Copyright (c) 2025 by fengzhilaoling@gmail.com, All Rights Reserved.
@@ -24,9 +24,9 @@ func GetInstancesInfoHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp
 	if clientPool == nil {
 		// 返回统一包装的空列表，便于客户端解析
 		logger.Info("GetInstancesInfoHandler: clientPool is nil", nil, nil)
-		return &mcp.CallToolResult{StructuredContent: makeResult([]zabbix.ClientInfo{})}, nil
+		return mcp.NewToolResultStructuredOnly(makeResult([]zabbix.ClientInfo{})), nil
 	}
 	infos := clientPool.Info()
 	logger.Info("GetInstancesInfoHandler: infos", nil, infos)
-	return &mcp.CallToolResult{StructuredContent: makeResult(infos)}, nil
+	return mcp.NewToolResultStructuredOnly(makeResult(infos)), nil
 }

@@ -1,7 +1,6 @@
 package zabbix
 
 import (
-	"context"
 	"errors"
 	"sync"
 	"time"
@@ -9,12 +8,14 @@ import (
 
 // ClientInfo 描述连接池中客户端的详细信息
 type ClientInfo struct {
-	URL      string    `json:"url"`
-	User     string    `json:"user"`
-	AuthType string    `json:"auth_type"`
-	ServerTZ string    `json:"server_tz"`
-	InUse    bool      `json:"in_use"`
-	AddedAt  time.Time `json:"added_at"`
+	InstenceName string    `json:"instance_name"`
+	URL          string    `json:"url"`
+	User         string    `json:"user"`
+	AuthType     string    `json:"auth_type"`
+	ServerTZ     string    `json:"server_tz"`
+	InUse        bool      `json:"in_use"`
+	AddedAt      time.Time `json:"added_at"`
+	Version      string    `json:"version"`
 }
 
 // ClientPool 管理一组可复用的 ZabbixClient
@@ -92,7 +93,15 @@ func (p *ClientPool) Add(client *ZabbixClient) error {
 	// 记录元信息并放入可用通道（此处可能会阻塞直到通道有空间）
 	p.all = append(p.all, client)
 	p.addedAt[client] = time.Now()
-	p.inUse[client] = false
+	// 不应盲目将 inUse 设为 false；应根据客户端的登录状态初始化。
+	// 如果客户端已持有有效的 AuthToken（例如 token 认证）则视为已登录。
+	loggedIn := false
+	if client != nil {
+		if client.GetAuthToken() != "" {
+			loggedIn = true
+		}
+	}
+	p.inUse[client] = loggedIn
 	p.ch <- client
 	return nil
 }
@@ -107,41 +116,6 @@ func (p *ClientPool) Get() (*ZabbixClient, error) {
 	p.inUse[client] = true
 	p.mu.Unlock()
 	return client, nil
-}
-
-// GetWithContext 尝试在给定的 context 内获取可用客户端，context 取消或超时时返回错误
-func (p *ClientPool) GetWithContext(ctx context.Context) (*ZabbixClient, error) {
-	select {
-	case client, ok := <-p.ch:
-		if !ok {
-			return nil, ErrPoolEmpty
-		}
-		p.mu.Lock()
-		p.inUse[client] = true
-		p.mu.Unlock()
-		return client, nil
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	}
-}
-
-// TryGet 在 timeout 时限内尝试获取客户端，超时返回 ErrPoolEmpty
-func (p *ClientPool) TryGet(timeout time.Duration) (*ZabbixClient, error) {
-	timer := time.NewTimer(timeout)
-	defer timer.Stop()
-
-	select {
-	case client, ok := <-p.ch:
-		if !ok {
-			return nil, ErrPoolEmpty
-		}
-		p.mu.Lock()
-		p.inUse[client] = true
-		p.mu.Unlock()
-		return client, nil
-	case <-timer.C:
-		return nil, ErrPoolEmpty
-	}
 }
 
 // Release 将 client 归还到池中；如果池已满返回 ErrPoolFull
@@ -191,17 +165,12 @@ func (p *ClientPool) Total() int {
 	return len(p.all)
 }
 
-// Available 返回当前可立即获取的客户端数（非使用中）
-func (p *ClientPool) Available() int {
-	return len(p.ch)
-}
-
 // Capacity 返回池容量
 func (p *ClientPool) Capacity() int {
 	return p.capacity
 }
 
-// Info 返回每个实例的详细信息
+// 返回每个实例的详细信息
 func (p *ClientPool) Info() []ClientInfo {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -212,13 +181,21 @@ func (p *ClientPool) Info() []ClientInfo {
 			inuse = v
 		}
 		added := p.addedAt[c]
+
+		// Safely obtain cached version (may be nil)
+		version := ""
+		if v := c.GetCachedVersion(); v != nil {
+			version = v.Full
+		}
 		info := ClientInfo{
-			URL:      c.URL,
-			User:     c.User,
-			AuthType: c.AuthType,
-			ServerTZ: c.ServerTZ,
-			InUse:    inuse,
-			AddedAt:  added,
+			InstenceName: c.InstenceName,
+			URL:          c.URL,
+			User:         c.User,
+			AuthType:     c.AuthType,
+			ServerTZ:     c.ServerTZ,
+			InUse:        inuse,
+			AddedAt:      added,
+			Version:      version,
 		}
 		out = append(out, info)
 	}
@@ -272,7 +249,6 @@ func (p *ClientPool) Close() {
 		p.mu.Lock()
 		defer p.mu.Unlock()
 		p.closed = true
-		close(p.ch)
-		// 可在此处对所有客户端执行额外清理（例如释放连接/句柄）
+		close(p.ch) // 关闭通道以通知所有等待的 Get 操作
 	})
 }

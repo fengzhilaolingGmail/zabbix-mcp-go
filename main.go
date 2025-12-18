@@ -2,7 +2,7 @@
  * @Author: fengzhilaoling fengzhilaoling@gmail.com
  * @Date: 2025-12-16 20:14:53
  * @LastEditors: fengzhilaoling
- * @LastEditTime: 2025-12-17 21:43:01
+ * @LastEditTime: 2025-12-18 16:37:54
  * @FilePath: \zabbix-mcp-go\main.go
  * @Description: 文件解释
  * Copyright (c) 2025 by fengzhilaoling@gmail.com, All Rights Reserved.
@@ -50,6 +50,9 @@ func main() {
 	if poolHandler != nil {
 		infos := poolHandler.Info()
 		lg.L().Infof("已初始化 Zabbix 客户端池，容量=%d", len(infos))
+		for _, info := range infos {
+			lg.L().Infof("客户端: %s 连接方式: %s 连接状态: %v 版本: %v", info.InstenceName, info.AuthType, info.InUse, info.Version)
+		}
 	}
 
 	// 创建MCP服务器
@@ -110,13 +113,14 @@ func InitPoolsFromConfig() (zabbix.ZabbixClientHandler, error) {
 	cfgs := make([]zabbix.ClientConfig, 0, n)
 	for _, inst := range AppConfig.Instances {
 		cfgs = append(cfgs, zabbix.ClientConfig{
-			URL:      inst.URL,
-			User:     inst.User,
-			Pass:     inst.Pass,
-			Token:    inst.Token,
-			AuthType: inst.AuthType,
-			Timeout:  30,
-			ServerTZ: "",
+			InstenceName: inst.Name,
+			URL:          inst.URL,
+			User:         inst.User,
+			Pass:         inst.Pass,
+			Token:        inst.Token,
+			AuthType:     inst.AuthType,
+			Timeout:      30,
+			ServerTZ:     "",
 		})
 	}
 

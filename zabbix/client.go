@@ -2,7 +2,7 @@
  * @Author: fengzhilaoling fengzhilaoling@gmail.com
  * @Date: 2025-12-16 20:19:03
  * @LastEditors: fengzhilaoling
- * @LastEditTime: 2025-12-18 10:30:58
+ * @LastEditTime: 2025-12-18 16:39:33
  * @FilePath: \zabbix-mcp-go\zabbix\client.go
  * @Description: Zabbix客户端相关功能
  * Copyright (c) 2025 by fengzhilaoling@gmail.com, All Rights Reserved.
@@ -21,31 +21,33 @@ import (
 )
 
 type ZabbixClient struct {
-	URL        string
-	User       string
-	Pass       string
-	AuthToken  string
-	AuthType   string // "password" 或 "token"
-	ServerTZ   string
-	HTTPClient *http.Client
-	mu         sync.Mutex
+	InstenceName string
+	URL          string
+	User         string
+	Pass         string
+	AuthToken    string
+	AuthType     string // "password" 或 "token"
+	ServerTZ     string
+	HTTPClient   *http.Client
+	mu           sync.Mutex
 	// 缓存检测到的版本（防止频繁请求）
 	cachedVersion *VersionInfo
 	cacheLock     sync.RWMutex
 }
 
 // NewZabbixClient 创建新的Zabbix客户端
-func NewZabbixClient(url, user, pass string, timeout int) *ZabbixClient {
+func NewZabbixClient(name, url, user, pass string, timeout int) *ZabbixClient {
 	var HTTPTimeout time.Duration = 120 * time.Second // 默认超时时间为120秒
 	if timeout > 0 {
 		HTTPTimeout = time.Duration(timeout) * time.Second
 	}
 	return &ZabbixClient{
-		URL:      url,
-		User:     user,
-		Pass:     pass,
-		ServerTZ: "",
-		AuthType: "password", // 默认为密码认证
+		InstenceName: name,
+		URL:          url,
+		User:         user,
+		Pass:         pass,
+		ServerTZ:     "",
+		AuthType:     "password", // 默认为密码认证
 		HTTPClient: &http.Client{
 			Timeout: HTTPTimeout,
 		},
@@ -54,29 +56,29 @@ func NewZabbixClient(url, user, pass string, timeout int) *ZabbixClient {
 
 // ClientConfig 是用于创建 ZabbixClient 的工厂配置结构体，便于在一处集中管理实例化逻辑
 type ClientConfig struct {
-	URL      string
-	User     string
-	Pass     string
-	Token    string
-	AuthType string // "password" 或 "token"
-	Timeout  int    // HTTP 超时（秒），0 表示使用默认值
-	ServerTZ string // 可选，设置服务器时区，空则保持默认
+	InstenceName string
+	URL          string
+	User         string
+	Pass         string
+	Token        string
+	AuthType     string // "password" 或 "token"
+	Timeout      int    // HTTP 超时（秒），0 表示使用默认值
+	ServerTZ     string // 可选，设置服务器时区，空则保持默认
 }
 
 // NewZabbixClientFromConfig 根据 ClientConfig 创建并初始化一个 *ZabbixClient。
 // 这样可以把实例化逻辑集中到工厂里，调用方（例如 main）只需传入配置即可；同时便于测试替换。
 func NewZabbixClientFromConfig(cfg ClientConfig) *ZabbixClient {
-	cli := NewZabbixClient(cfg.URL, cfg.User, cfg.Pass, cfg.Timeout)
+	cli := NewZabbixClient(cfg.InstenceName, cfg.URL, cfg.User, cfg.Pass, cfg.Timeout)
 	if cfg.AuthType != "" {
 		cli.SetAuthType(cfg.AuthType)
 	}
 	if cfg.Token != "" {
 		cli.SetAuthToken(cfg.Token)
 	}
-	// 如果调用方希望初始化 ServerTZ，可以传入；否则保持默认（由 SetServerTimezone 处理空串）
-	if cfg.ServerTZ != "" {
-		cli.SetServerTimezone(cfg.ServerTZ)
-	}
+	// 时区使用配置中的值，如果为空则使用本地时区
+	cli.SetServerTimezone(cfg.ServerTZ)
+	cli.Login() // 登录以获取认证令牌
 	return cli
 }
 
