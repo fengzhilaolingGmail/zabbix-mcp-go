@@ -13,11 +13,13 @@ package server
 import (
 	"context"
 	"fmt"
+
+	"zabbixMcp/models"
 	"zabbixMcp/zabbix"
 )
 
 // GetHosts 调用底层 ClientProvider 执行 host.get，并返回解析后的列表
-func GetHosts(ctx context.Context, provider zabbix.ClientProvider, params map[string]interface{}) ([]map[string]interface{}, error) {
+func GetHosts(ctx context.Context, provider zabbix.ClientProvider, spec models.ParamSpec) ([]map[string]interface{}, error) {
 	if provider == nil {
 		return nil, fmt.Errorf("no zabbix client")
 	}
@@ -28,7 +30,7 @@ func GetHosts(ctx context.Context, provider zabbix.ClientProvider, params map[st
 	var callErr error
 	defer func() { lease.Release(callErr) }()
 	client := lease.Client()
-	adapted := client.AdaptAPIParams("host.get", params)
+	adapted := client.AdaptAPIParams("host.get", spec)
 	var hosts []map[string]interface{}
 	callErr = client.Call(ctx, "host.get", adapted, &hosts)
 	if callErr != nil {

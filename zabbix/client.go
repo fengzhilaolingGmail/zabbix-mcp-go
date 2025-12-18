@@ -1,12 +1,12 @@
 /*
- * @Author: fengzhilaoling fengzhilaoling@gmail.com
- * @Date: 2025-12-16 20:19:03
- * @LastEditors: fengzhilaoling
- * @LastEditTime: 2025-12-18 21:39:06
- * @FilePath: \zabbix-mcp-go\zabbix\client.go
- * @Description: Zabbix客户端相关功能
- * Copyright (c) 2025 by fengzhilaoling@gmail.com, All Rights Reserved.
- */
+  - @Author: fengzhilaoling fengzhilaoling@gmail.com
+  - @Date: 2025-12-16 20:19:03
+    }
+  - @LastEditTime: 2025-12-18 21:39:06
+  - @FilePath: \zabbix-mcp-go\zabbix\client.go
+  - @Description: Zabbix客户端相关功能
+  - Copyright (c) 2025 by fengzhilaoling@gmail.com, All Rights Reserved.
+*/
 package zabbix
 
 import (
@@ -20,7 +20,9 @@ import (
 	"strings"
 	"sync"
 	"time"
+
 	"zabbixMcp/logger"
+	"zabbixMcp/models"
 )
 
 type ZabbixClient struct {
@@ -192,7 +194,7 @@ func (c *ZabbixClient) call(ctx context.Context, method string, params interface
 
 	if payload, err := first(ctx, method, params, auth); err == nil {
 		return payload, nil
-	} else if _, ok := err.(*RPCError); ok && second != nil {
+	} else if _, ok := err.(*models.RPCError); ok && second != nil {
 		if altPayload, altErr := second(ctx, method, params, auth); altErr == nil {
 			c.setHeaderPreference(!primaryHeader)
 			return altPayload, nil
@@ -204,7 +206,7 @@ func (c *ZabbixClient) call(ctx context.Context, method string, params interface
 }
 
 func (c *ZabbixClient) callWithAuth(ctx context.Context, method string, params interface{}, auth string) (json.RawMessage, error) {
-	request := JSONRPCRequest{
+	request := models.JSONRPCRequest{
 		JSONRPC: "2.0",
 		Method:  method,
 		Params:  params,
@@ -227,7 +229,7 @@ func (c *ZabbixClient) callWithAuth(ctx context.Context, method string, params i
 }
 
 func (c *ZabbixClient) callWithHeaderAuth(ctx context.Context, method string, params interface{}, auth string) (json.RawMessage, error) {
-	request := JSONRPCRequest{
+	request := models.JSONRPCRequest{
 		JSONRPC: "2.0",
 		Method:  method,
 		Params:  params,
@@ -263,7 +265,7 @@ func (c *ZabbixClient) doRequest(req *http.Request) (json.RawMessage, error) {
 		return nil, fmt.Errorf("读取响应失败: %w", err)
 	}
 
-	var response JSONRPCResponse
+	var response models.JSONRPCResponse
 	if err := json.Unmarshal(body, &response); err != nil {
 		return nil, fmt.Errorf("解析响应失败: %w", err)
 	}
@@ -305,7 +307,7 @@ func isAuthError(err error) bool {
 	if err == nil {
 		return false
 	}
-	if rpcErr, ok := err.(*RPCError); ok {
+	if rpcErr, ok := err.(*models.RPCError); ok {
 		return rpcErr.Code == -32602 || rpcErr.Code == -32500
 	}
 	return false
@@ -315,8 +317,8 @@ func (c *ZabbixClient) GetDetailedVersionFeatures() map[string]interface{} {
 	return NewVersionDetector(c).GetDetailedVersionFeatures()
 }
 
-func (c *ZabbixClient) AdaptAPIParams(method string, params map[string]interface{}) map[string]interface{} {
-	return NewVersionDetector(c).AdaptAPIParams(method, params)
+func (c *ZabbixClient) AdaptAPIParams(method string, spec models.ParamSpec) map[string]interface{} {
+	return NewVersionDetector(c).AdaptAPIParams(method, spec)
 }
 
 func buildAPIEndpoint(raw string) (string, error) {

@@ -15,7 +15,9 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
 	"zabbixMcp/logger"
+	"zabbixMcp/models"
 )
 
 // VersionInfo Zabbix版本信息
@@ -167,13 +169,21 @@ func (vd *VersionDetector) GetDetailedVersionFeatures() map[string]interface{} {
 }
 
 // AdaptAPIParams 根据版本适配API参数
-func (vd *VersionDetector) AdaptAPIParams(method string, params map[string]interface{}) map[string]interface{} {
+func (vd *VersionDetector) AdaptAPIParams(method string, spec models.ParamSpec) map[string]interface{} {
 	version, err := vd.DetectVersion(context.Background())
+
+	var params map[string]interface{}
+	if spec != nil {
+		params = spec.BuildParams()
+	} else {
+		params = map[string]interface{}{}
+	}
+
 	if err != nil {
 		return params
 	}
 
-	adaptedParams := make(map[string]interface{})
+	adaptedParams := make(map[string]interface{}, len(params))
 	for k, v := range params {
 		adaptedParams[k] = v
 	}

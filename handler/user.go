@@ -13,6 +13,7 @@ import (
 	"context"
 	"fmt"
 
+	"zabbixMcp/models"
 	"zabbixMcp/server"
 
 	"github.com/mark3labs/mcp-go/mcp"
@@ -25,8 +26,8 @@ func GetUsersHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToo
 	}
 
 	// 使用 server 层处理业务逻辑
-	params := map[string]interface{}{"output": "extend"}
-	users, err := server.GetUsers(ctx, clientPool, params)
+	spec := models.UserGetParams{Output: "extend"}
+	users, err := server.GetUsers(ctx, clientPool, spec)
 	if err != nil {
 		return nil, fmt.Errorf("调用 user.get 失败: %w", err)
 	}

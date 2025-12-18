@@ -12,14 +12,16 @@ package zabbix
 import (
 	"context"
 	"sync"
+
 	"zabbixMcp/logger"
+	"zabbixMcp/models"
 )
 
 // APIClient 抽象出最小可用的 Zabbix API 客户端能力
 type APIClient interface {
 	Call(ctx context.Context, method string, params interface{}, result interface{}) error // 执行一次API调用
 	GetDetailedVersionFeatures() map[string]interface{}                                    // 获取详细的版本特性
-	AdaptAPIParams(method string, params map[string]interface{}) map[string]interface{}    // 适配API参数
+	AdaptAPIParams(method string, spec models.ParamSpec) map[string]interface{}            // 适配API参数
 }
 
 // ClientLease 表示一次安全的租借句柄，用于确保归还

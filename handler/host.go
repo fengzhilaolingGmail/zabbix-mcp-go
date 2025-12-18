@@ -12,6 +12,8 @@ package handler
 import (
 	"context"
 	"fmt"
+
+	"zabbixMcp/models"
 	"zabbixMcp/server"
 
 	"github.com/mark3labs/mcp-go/mcp"
@@ -23,8 +25,8 @@ func GetHostsHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToo
 		return mcp.NewToolResultStructuredOnly(makeResult([]map[string]interface{}{})), nil
 	}
 
-	params := map[string]interface{}{"output": "extend"}
-	hosts, err := server.GetHosts(ctx, clientPool, params)
+	spec := models.HostGetParams{Output: "extend"}
+	hosts, err := server.GetHosts(ctx, clientPool, spec)
 	if err != nil {
 		return nil, fmt.Errorf("调用 host.get 失败: %w", err)
 	}
