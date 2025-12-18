@@ -171,11 +171,17 @@ func (p *ClientPool) Capacity() int {
 }
 
 // 返回每个实例的详细信息
-func (p *ClientPool) Info() []ClientInfo {
+func (p *ClientPool) Info(instenceName string) []ClientInfo {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+
+	// 如果 instenceName 为空，返回所有实例；否则只返回名称匹配的实例
 	out := make([]ClientInfo, 0, len(p.all))
 	for _, c := range p.all {
+		if instenceName != "" && c.InstenceName != instenceName {
+			// 非空参数且不匹配，跳过
+			continue
+		}
 		inuse := false
 		if v, ok := p.inUse[c]; ok {
 			inuse = v

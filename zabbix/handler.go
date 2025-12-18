@@ -14,7 +14,7 @@ type ZabbixClientHandler interface {
 	SetCachedVersion(v *VersionInfo)
 	ClearCachedVersion()
 	// Info 返回关于底层实例的元信息（对单实例返回长度为1的切片）
-	Info() []ClientInfo
+	Info(string) []ClientInfo
 	Call(method string, params interface{}) (interface{}, error)
 }
 
@@ -105,17 +105,17 @@ func (h *singleClientHandler) Call(method string, params interface{}) (interface
 	return h.client.Call(method, params)
 }
 
-func (h *singleClientHandler) Info() []ClientInfo {
+func (h *singleClientHandler) Info(instenceName string) []ClientInfo {
 	if h == nil || h.client == nil {
 		return []ClientInfo{}
 	}
 	info := ClientInfo{
-		URL:      h.client.URL,
-		User:     h.client.User,
-		AuthType: h.client.AuthType,
-		ServerTZ: h.client.ServerTZ,
-		InUse:    false,
-		AddedAt:  time.Now(),
+		InstenceName: h.client.InstenceName,
+		User:         h.client.User,
+		AuthType:     h.client.AuthType,
+		ServerTZ:     h.client.ServerTZ,
+		InUse:        false,
+		AddedAt:      time.Now(),
 	}
 	return []ClientInfo{info}
 }
@@ -186,9 +186,9 @@ func (h *poolClientHandler) Call(method string, params interface{}) (interface{}
 	return client.Call(method, params)
 }
 
-func (h *poolClientHandler) Info() []ClientInfo {
+func (h *poolClientHandler) Info(instenceName string) []ClientInfo {
 	if h == nil || h.pool == nil {
 		return []ClientInfo{}
 	}
-	return h.pool.Info()
+	return h.pool.Info(instenceName)
 }

@@ -20,11 +20,11 @@ type mockHandler struct {
 	info   []zabbix.ClientInfo
 }
 
-func (m *mockHandler) SetServerTimezone(tz string)            {}
-func (m *mockHandler) GetCachedVersion() *zabbix.VersionInfo  { return nil }
-func (m *mockHandler) SetCachedVersion(v *zabbix.VersionInfo) {}
-func (m *mockHandler) ClearCachedVersion()                    {}
-func (m *mockHandler) Info() []zabbix.ClientInfo              { return m.info }
+func (m *mockHandler) SetServerTimezone(tz string)                  {}
+func (m *mockHandler) GetCachedVersion() *zabbix.VersionInfo        { return nil }
+func (m *mockHandler) SetCachedVersion(v *zabbix.VersionInfo)       {}
+func (m *mockHandler) ClearCachedVersion()                          {}
+func (m *mockHandler) Info(instanceName string) []zabbix.ClientInfo { return m.info }
 func (m *mockHandler) Call(method string, params interface{}) (interface{}, error) {
 	if m.callFn == nil {
 		return nil, errors.New("no callFn set")

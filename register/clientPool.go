@@ -2,7 +2,7 @@
  * @Author: fengzhilaoling fengzhilaoling@gmail.com
  * @Date: 2025-12-17 20:48:34
  * @LastEditors: fengzhilaoling
- * @LastEditTime: 2025-12-18 11:06:33
+ * @LastEditTime: 2025-12-18 18:02:04
  * @FilePath: \zabbix-mcp-go\register\clientPool.go
  * @Description: 文件解释
  * Copyright (c) 2025 by fengzhilaoling@gmail.com, All Rights Reserved.
@@ -22,6 +22,7 @@ func registerClientPool(s *server.MCPServer) {
 	s.AddTool(
 		mcp.NewTool("get_instances_info",
 			mcp.WithDescription("获取所有Zabbix实例的详细信息"),
+			mcp.WithString("instance", mcp.Description("Zabbix实例名称")),
 		),
 		handler.GetInstancesInfoHandler,
 	)

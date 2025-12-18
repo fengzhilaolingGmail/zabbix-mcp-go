@@ -2,7 +2,7 @@
  * @Author: fengzhilaoling fengzhilaoling@gmail.com
  * @Date: 2025-12-16 20:14:53
  * @LastEditors: fengzhilaoling
- * @LastEditTime: 2025-12-18 16:37:54
+ * @LastEditTime: 2025-12-18 17:57:45
  * @FilePath: \zabbix-mcp-go\main.go
  * @Description: 文件解释
  * Copyright (c) 2025 by fengzhilaoling@gmail.com, All Rights Reserved.
@@ -48,7 +48,7 @@ func main() {
 		lg.L().Fatalf("初始化 Zabbix 客户端池失败: %v", err)
 	}
 	if poolHandler != nil {
-		infos := poolHandler.Info()
+		infos := poolHandler.Info("")
 		lg.L().Infof("已初始化 Zabbix 客户端池，容量=%d", len(infos))
 		for _, info := range infos {
 			lg.L().Infof("客户端: %s 连接方式: %s 连接状态: %v 版本: %v", info.InstenceName, info.AuthType, info.InUse, info.Version)
