@@ -13,6 +13,10 @@ type ZabbixClientHandler interface {
 	GetCachedVersion() *VersionInfo
 	SetCachedVersion(v *VersionInfo)
 	ClearCachedVersion()
+	// GetDetailedVersionFeatures 返回针对当前底层实例（或池）的详细能力映射
+	GetDetailedVersionFeatures() map[string]interface{}
+	// AdaptAPIParams 根据底层 Zabbix 版本调整传入的 API 参数，返回调整后的参数拷贝
+	AdaptAPIParams(method string, params map[string]interface{}) map[string]interface{}
 	// Info 返回关于底层实例的元信息（对单实例返回长度为1的切片）
 	Info(string) []ClientInfo
 	Call(method string, params interface{}) (interface{}, error)
@@ -120,6 +124,24 @@ func (h *singleClientHandler) Info(instenceName string) []ClientInfo {
 	return []ClientInfo{info}
 }
 
+// GetDetailedVersionFeatures 实现在 singleClientHandler 上，优先使用当前客户端检测到的版本
+func (h *singleClientHandler) GetDetailedVersionFeatures() map[string]interface{} {
+	if h == nil || h.client == nil {
+		return make(map[string]interface{})
+	}
+	vd := NewVersionDetector(h.client)
+	return vd.GetDetailedVersionFeatures()
+}
+
+// AdaptAPIParams 在 singleClientHandler 上实现：根据底层版本适配参数
+func (h *singleClientHandler) AdaptAPIParams(method string, params map[string]interface{}) map[string]interface{} {
+	if h == nil || h.client == nil {
+		return params
+	}
+	vd := NewVersionDetector(h.client)
+	return vd.AdaptAPIParams(method, params)
+}
+
 // --- poolClientHandler 方法实现 ---
 func (h *poolClientHandler) SetServerTimezone(tz string) {
 	if h == nil || h.pool == nil {
@@ -191,4 +213,31 @@ func (h *poolClientHandler) Info(instenceName string) []ClientInfo {
 		return []ClientInfo{}
 	}
 	return h.pool.Info(instenceName)
+}
+
+// GetDetailedVersionFeatures 在 poolClientHandler 上实现：使用池中任意一个可用客户端进行版本检测，若无可用客户端返回默认功能集
+func (h *poolClientHandler) GetDetailedVersionFeatures() map[string]interface{} {
+	// 尝试找到一个非nil的客户端用于检测
+	for _, c := range h.pool.all {
+		if c != nil {
+			vd := NewVersionDetector(c)
+			return vd.GetDetailedVersionFeatures()
+		}
+	}
+	res := make(map[string]interface{})
+	return res
+}
+
+// AdaptAPIParams 在 poolClientHandler 上实现：尝试用池中任意客户端的版本信息来适配参数
+func (h *poolClientHandler) AdaptAPIParams(method string, params map[string]interface{}) map[string]interface{} {
+	if h == nil || h.pool == nil {
+		return params
+	}
+	for _, c := range h.pool.all {
+		if c != nil {
+			vd := NewVersionDetector(c)
+			return vd.AdaptAPIParams(method, params)
+		}
+	}
+	return params
 }

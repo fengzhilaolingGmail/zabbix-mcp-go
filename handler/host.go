@@ -1,3 +1,12 @@
+/*
+ * @Author: fengzhilaoling fengzhilaoling@gmail.com
+ * @Date: 2025-12-18 11:20:36
+ * @LastEditors: fengzhilaoling
+ * @LastEditTime: 2025-12-18 19:50:37
+ * @FilePath: \zabbix-mcp-go\handler\host.go
+ * @Description: 文件详情
+ * @Copyright: Copyright (c) 2025 by fengzhilaoling@gmail.com, All Rights Reserved.
+ */
 package handler
 
 import (
@@ -21,3 +30,6 @@ func GetHostsHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToo
 	}
 	return mcp.NewToolResultStructuredOnly(makeResult(hosts)), nil
 }
+
+// 通过主机组查询
+// 通过主机名查询 详细信息 ()

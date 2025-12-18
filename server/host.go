@@ -20,7 +20,6 @@ func GetHosts(client zabbix.ZabbixClientHandler, params map[string]interface{}) 
 	if client == nil {
 		return nil, fmt.Errorf("no zabbix client")
 	}
-
 	res, err := client.Call("host.get", params)
 	if err != nil {
 		return nil, err

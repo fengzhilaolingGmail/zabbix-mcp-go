@@ -2,7 +2,7 @@
  * @Author: fengzhilaoling fengzhilaoling@gmail.com
  * @Date: 2025-12-16 20:54:52
  * @LastEditors: fengzhilaoling
- * @LastEditTime: 2025-12-18 16:49:22
+ * @LastEditTime: 2025-12-18 19:25:29
  * @FilePath: \zabbix-mcp-go\zabbix\version.go
  * @Description: 版本检测相关功能
  * Copyright (c) 2025 by fengzhilaoling@gmail.com, All Rights Reserved.
@@ -179,6 +179,7 @@ func (vd *VersionDetector) AdaptAPIParams(method string, params map[string]inter
 		if version.Major < 4 {
 			// 旧版本不支持某些参数
 			delete(adaptedParams, "selectTags")
+			// adaptedParams["output"] = []string{"hostid", "name"}
 		}
 	case "item.get":
 		if version.Major < 4 {
