@@ -17,23 +17,12 @@ import (
 
 // Login 登录Zabbix API
 func (c *ZabbixClient) Login(ctx context.Context) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	authType := c.getAuthType()
+	currentToken := c.getAuthToken()
 
 	// 如果已经设置了token认证，直接验证token有效性
-	if c.AuthType == "token" && c.AuthToken != "" {
-		// 保存当前的AuthToken，临时清空它以调用不需要认证的API
-		savedToken := c.AuthToken
-		c.AuthToken = ""
-
-		// 尝试调用apiinfo.version来验证连接是否正常
-		// apiinfo.version不需要认证，所以传入空auth参数
-		_, err := c.call(ctx, "apiinfo.version", map[string]interface{}{}, "")
-
-		// 恢复AuthToken
-		c.AuthToken = savedToken
-
-		if err != nil {
+	if authType == "token" && currentToken != "" {
+		if _, err := c.call(ctx, "apiinfo.version", map[string]interface{}{}, ""); err != nil {
 			return fmt.Errorf("token认证失败: %w", err)
 		}
 		return nil
@@ -56,21 +45,24 @@ func (c *ZabbixClient) Login(ctx context.Context) error {
 		return fmt.Errorf("解析登录响应失败: %w", err)
 	}
 
+	c.mu.Lock()
 	c.AuthToken = authToken
+	c.mu.Unlock()
 	return nil
 }
 
 // Logout 登出Zabbix API
 func (c *ZabbixClient) Logout(ctx context.Context) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	if c.AuthToken == "" {
+	token := c.getAuthToken()
+	if token == "" {
 		return nil
 	}
 
-	_, err := c.call(ctx, "user.logout", nil, c.AuthToken)
+	_, err := c.call(ctx, "user.logout", nil, token)
+
+	c.mu.Lock()
 	c.AuthToken = ""
+	c.mu.Unlock()
 	return err
 }
 
