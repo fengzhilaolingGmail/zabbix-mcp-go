@@ -2,8 +2,9 @@
   - @Author: fengzhilaoling fengzhilaoling@gmail.com
   - @Date: 2025-12-16 20:19:03
     }
-  - @LastEditTime: 2025-12-18 21:39:06
-  - @FilePath: \zabbix-mcp-go\zabbix\client.go
+
+ * @LastEditTime: 2025-12-19 18:32:03
+ * @FilePath: \zabbix-mcp-go\zabbix\client.go
   - @Description: Zabbix客户端相关功能
   - Copyright (c) 2025 by fengzhilaoling@gmail.com, All Rights Reserved.
 */
@@ -148,7 +149,7 @@ func (c *ZabbixClient) Call(ctx context.Context, method string, params interface
 	if err != nil {
 		return err
 	}
-
+	logger.L().Infof("call", "method:%s, params:%v, result:%v", method, params, result)
 	payload, err := c.call(ctx, method, params, authToken)
 	if err != nil {
 		if isAuthError(err) && c.getAuthType() != "token" {
