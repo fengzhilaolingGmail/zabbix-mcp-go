@@ -24,7 +24,6 @@ func GetUsersHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToo
 	if clientPool == nil {
 		return mcp.NewToolResultStructuredOnly(makeResult([]map[string]interface{}{})), nil
 	}
-
 	// 使用 server 层处理业务逻辑
 	spec := models.UserGetParams{Output: "extend"}
 	users, err := server.GetUsers(ctx, clientPool, spec)

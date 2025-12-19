@@ -18,7 +18,7 @@ import (
 
 // registerClientPool 注册与 Zabbix 客户端池相关的 MCP 工具。
 // 目前仅注册工具元信息；具体处理器在 handler 包未实现时暂留为 nil，以免影响构建。
-func registerClientPool(s *server.MCPServer) {
+func registerInstances(s *server.MCPServer) {
 	s.AddTool(
 		mcp.NewTool("get_instances_info",
 			mcp.WithDescription("获取所有Zabbix实例的详细信息"),

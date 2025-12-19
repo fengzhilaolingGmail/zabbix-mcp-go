@@ -15,5 +15,6 @@ import (
 
 func Registers(s *server.MCPServer) {
 	// 注册 ClientPool 相关工具
-	registerClientPool(s)
+	registerInstances(s)
+	registerUser(s)
 }
