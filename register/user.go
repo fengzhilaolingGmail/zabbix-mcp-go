@@ -13,7 +13,8 @@ func registerUser(s *server.MCPServer) {
 	s.AddTool(
 		mcp.NewTool("get_users",
 			mcp.WithDescription("获取所有Zabbix用户信息"),
-			mcp.WithString("username", mcp.Description("Zabbix用户名")),
+			mcp.WithString("instance", mcp.Required(), mcp.Description("Zabbix实例名称必须填")),
+			mcp.WithString("username", mcp.Description("Zabbix用户名,留空表示获取所有用户")),
 		),
 		handler.GetUsersHandler,
 	)

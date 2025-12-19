@@ -2,7 +2,7 @@
  * @Author: fengzhilaoling fengzhilaoling@gmail.com
  * @Date: 2025-12-16 20:54:52
  * @LastEditors: fengzhilaoling
- * @LastEditTime: 2025-12-18 19:25:29
+ * @LastEditTime: 2025-12-19 18:26:45
  * @FilePath: \zabbix-mcp-go\zabbix\version.go
  * @Description: 版本检测相关功能
  * Copyright (c) 2025 by fengzhilaoling@gmail.com, All Rights Reserved.
@@ -196,6 +196,9 @@ func (vd *VersionDetector) AdaptAPIParams(method string, spec models.ParamSpec) 
 			delete(adaptedParams, "selectTags")
 			// adaptedParams["output"] = []string{"hostid", "name"}
 		}
+		// if version.Major > 5 {
+		// 	delete(adaptedParams, "filter[\"alias\"]")
+		// }
 	case "item.get":
 		if version.Major < 4 {
 			delete(adaptedParams, "selectTags")

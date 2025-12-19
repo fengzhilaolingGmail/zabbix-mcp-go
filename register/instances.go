@@ -26,18 +26,4 @@ func registerInstances(s *server.MCPServer) {
 		),
 		handler.GetInstancesInfoHandler,
 	)
-
-	s.AddTool(
-		mcp.NewTool("get_users",
-			mcp.WithDescription("获取所有Zabbix用户"),
-		),
-		handler.GetUsersHandler,
-	)
-
-	s.AddTool(
-		mcp.NewTool("get_hosts",
-			mcp.WithDescription("获取所有Zabbix主机"),
-		),
-		handler.GetHostsHandler,
-	)
 }

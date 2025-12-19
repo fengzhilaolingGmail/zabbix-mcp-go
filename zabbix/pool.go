@@ -3,6 +3,7 @@ package zabbix
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 )
@@ -116,6 +117,40 @@ func (p *ClientPool) Acquire(ctx context.Context) (ClientLease, error) {
 		}
 		p.markInUse(client, true)
 		return newPoolLease(p, client), nil
+	}
+}
+
+// AcquireByInstance 获取指定实例的客户端，如果实例不存在或一直繁忙会阻塞直到 ctx 取消
+func (p *ClientPool) AcquireByInstance(ctx context.Context, instance string) (ClientLease, error) {
+	if instance == "" {
+		return p.Acquire(ctx)
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if !p.hasInstance(instance) {
+		return nil, fmt.Errorf("instance %s not found", instance)
+	}
+	for {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case client, ok := <-p.idle:
+			if !ok {
+				return nil, ErrPoolClosed
+			}
+			if client.Instance == instance {
+				p.markInUse(client, true)
+				return newPoolLease(p, client), nil
+			}
+			// 非目标实例，重新放回队列并稍作等待避免空转
+			p.idle <- client
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-time.After(10 * time.Millisecond):
+			}
+		}
 	}
 }
 
@@ -242,6 +277,17 @@ func (p *ClientPool) Close() {
 
 // 确保 ClientPool 实现 ClientProvider
 var _ ClientProvider = (*ClientPool)(nil)
+
+func (p *ClientPool) hasInstance(instance string) bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	for _, c := range p.order {
+		if c.Instance == instance {
+			return true
+		}
+	}
+	return false
+}
 
 type poolLease struct {
 	pool   *ClientPool

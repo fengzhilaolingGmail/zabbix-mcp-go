@@ -18,12 +18,21 @@ import (
 	"zabbixMcp/zabbix"
 )
 
-// GetUsers 调用底层 ClientProvider 执行 user.get，并返回解析后的列表
-func GetUsers(ctx context.Context, provider zabbix.ClientProvider, spec models.ParamSpec) ([]map[string]interface{}, error) {
+// GetUsers 调用底层 ClientProvider 执行 user.get，并返回解析后的列表。
+// instanceName 为空时使用任意可用客户端，否则强制选择指定实例。
+func GetUsers(ctx context.Context, provider zabbix.ClientProvider, spec models.ParamSpec, instanceName string) ([]map[string]interface{}, error) {
 	if provider == nil {
 		return nil, fmt.Errorf("no zabbix client")
 	}
-	lease, err := provider.Acquire(ctx)
+	var (
+		lease zabbix.ClientLease
+		err   error
+	)
+	if instanceName != "" {
+		lease, err = provider.AcquireByInstance(ctx, instanceName)
+	} else {
+		lease, err = provider.Acquire(ctx)
+	}
 	if err != nil {
 		return nil, err
 	}

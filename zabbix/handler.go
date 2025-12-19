@@ -33,8 +33,9 @@ type ClientLease interface {
 // ClientProvider 抽象客户端提供方（单实例或连接池）
 type ClientProvider interface {
 	Acquire(ctx context.Context) (ClientLease, error) // 获取一个客户端句柄
-	Info(instanceName string) []ClientInfo            // 获取客户端信息
-	Close()                                           // 关闭客户端提供方
+	AcquireByInstance(ctx context.Context, instance string) (ClientLease, error)
+	Info(instanceName string) []ClientInfo // 获取客户端信息
+	Close()                                // 关闭客户端提供方
 }
 
 // NewClientProviderFromConfigs 根据配置创建 ClientProvider
