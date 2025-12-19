@@ -9,14 +9,15 @@ import (
 
 // ClientInfo 描述连接池中客户端的详细信息
 type ClientInfo struct {
-	Instance string    `json:"instance"`
-	URL      string    `json:"url"`
-	User     string    `json:"user"`
-	AuthType string    `json:"auth_type"`
-	ServerTZ string    `json:"server_tz"`
-	InUse    bool      `json:"in_use"`
-	AddedAt  time.Time `json:"added_at"`
-	Version  string    `json:"version"`
+	Instance  string    `json:"instance"`
+	URL       string    `json:"url"`
+	User      string    `json:"user"`
+	AuthType  string    `json:"auth_type"`
+	ServerTZ  string    `json:"server_tz"`
+	InUse     bool      `json:"in_use"`
+	Connected bool      `json:"connected"`
+	AddedAt   time.Time `json:"added_at"`
+	Version   string    `json:"version"`
 }
 
 var (
@@ -159,14 +160,15 @@ func (p *ClientPool) Info(Instance string) []ClientInfo {
 			version = v.Full
 		}
 		info := ClientInfo{
-			Instance: c.Instance,
-			URL:      c.URL,
-			User:     c.User,
-			AuthType: c.AuthType,
-			ServerTZ: c.ServerTZ,
-			InUse:    meta != nil && meta.inUse,
-			AddedAt:  meta.addedAt,
-			Version:  version,
+			Instance:  c.Instance,
+			URL:       c.URL,
+			User:      c.User,
+			AuthType:  c.AuthType,
+			ServerTZ:  c.ServerTZ,
+			InUse:     meta != nil && meta.inUse,
+			Connected: c.IsConnected(),
+			AddedAt:   meta.addedAt,
+			Version:   version,
 		}
 		out = append(out, info)
 	}

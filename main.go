@@ -51,7 +51,7 @@ func main() {
 		infos := poolHandler.Info("")
 		lg.L().Infof("已初始化 Zabbix 客户端池，容量=%d", len(infos))
 		for _, info := range infos {
-			lg.L().Infof("客户端: %s 连接方式: %s 连接状态: %v 版本: %v", info.Instance, info.AuthType, info.InUse, info.Version)
+			lg.L().Infof("客户端: %s 连接方式: %s 登录状态: %v 使用中: %v 版本: %v", info.Instance, info.AuthType, info.Connected, info.InUse, info.Version)
 		}
 	}
 

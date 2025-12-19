@@ -303,6 +303,13 @@ func (c *ZabbixClient) getAuthType() string {
 	return c.AuthType
 }
 
+// IsConnected 判断客户端是否已具备可用的认证信息
+func (c *ZabbixClient) IsConnected() bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.AuthToken != ""
+}
+
 func isAuthError(err error) bool {
 	if err == nil {
 		return false
