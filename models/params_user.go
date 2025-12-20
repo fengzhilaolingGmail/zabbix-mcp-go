@@ -1,17 +1,21 @@
 package models
 
-// UserGetParams 提供更类型化的 user.get 参数描述
-//
-// 设计目标：在保持常见字段（userids/alias/output）简单易用的同时，兼容
-// Zabbix user.get 的更多能力，例如访问权限、分组/媒介筛选、分页排序等。
-// 结构中大部分字段都是可选的，对应 API 中的等名参数。
-type UserGetParams struct {
-	UserIDs      []string               // userids
-	UserGroupIDs []string               // usrgrpids
-	MediaTypeIDs []string               // mediatypeids
-	Alias        string                 // 兼容旧用法：filter.alias = alias
-	Filter       map[string]interface{} // 任意 filter 条件，例如 {"username": []string{"admin"}}
-	Search       map[string]interface{} // search 条件，例如 {"username": "ops*"}
+type UserParams struct {
+	UserIDs       []string // userids
+	MediaTypeIDs  []string // mediatypeids
+	SelectUsrgrps []string
+	UserName      string
+	Name          string
+	Passwd        string
+	Roleid        string
+	UserGroup     string
+	Userid        string
+	Surname       string
+	CurrentPasswd string
+	Usrgrps       []string
+	Alias         string                 // 兼容旧用法：filter.alias = alias
+	Filter        map[string]interface{} // 任意 filter 条件，例如 {"username": []string{"admin"}}
+	Search        map[string]interface{} // search 条件，例如 {"username": "ops*"}
 
 	Output       string   // "extend" 等字符串形式
 	OutputFields []string // 明确字段列表
@@ -21,7 +25,6 @@ type UserGetParams struct {
 	SelectMediasAll     bool
 	SelectMediasFields  []string
 	SelectRole          bool
-	SelectUsrgrpsAll    bool
 	SelectUsrgrpsFields []string
 
 	SortField string
@@ -29,20 +32,18 @@ type UserGetParams struct {
 	Limit     int
 }
 
-// BuildParams 将 UserGetParams 转成 Zabbix API 所需的 map
-func (p UserGetParams) BuildParams() map[string]interface{} {
+func (p UserParams) BuildParams() map[string]interface{} {
 	params := map[string]interface{}{}
 
 	if len(p.UserIDs) > 0 {
 		params["userids"] = append([]string(nil), p.UserIDs...)
 	}
-	if len(p.UserGroupIDs) > 0 {
-		params["usrgrpids"] = append([]string(nil), p.UserGroupIDs...)
-	}
 	if len(p.MediaTypeIDs) > 0 {
 		params["mediatypeids"] = append([]string(nil), p.MediaTypeIDs...)
 	}
-
+	if len(p.SelectUsrgrps) > 0 {
+		params["selectUsrgrps"] = p.SelectUsrgrps
+	}
 	filter := map[string]interface{}{}
 	if len(p.Filter) > 0 {
 		for k, v := range p.Filter {
@@ -84,12 +85,6 @@ func (p UserGetParams) BuildParams() map[string]interface{} {
 		params["selectRole"] = true
 	}
 
-	if len(p.SelectUsrgrpsFields) > 0 {
-		params["selectUsrgrps"] = append([]string(nil), p.SelectUsrgrpsFields...)
-	} else if p.SelectUsrgrpsAll {
-		params["selectUsrgrps"] = true
-	}
-
 	if p.SortField != "" {
 		params["sortfield"] = p.SortField
 	}
@@ -99,35 +94,34 @@ func (p UserGetParams) BuildParams() map[string]interface{} {
 	if p.Limit > 0 {
 		params["limit"] = p.Limit
 	}
+	if p.UserName != "" {
+		params["alias"] = p.UserName
+		params["username"] = p.UserName
+	}
+	if p.Name != "" {
+		params["name"] = p.Name
+	}
+	if p.Surname != "" {
+		params["surname"] = p.Surname
+	}
+	if p.Passwd != "" {
+		params["passwd"] = p.Passwd
+	}
+	if p.Roleid != "" {
+		params["roleid"] = p.Roleid
+	}
+	if p.UserGroup != "" {
+		params["usrgrps"] = []map[string]interface{}{{"usrgrpid": p.UserGroup}}
+	}
+	if p.Userid != "" {
+		params["userid"] = p.Userid
+	}
+	if p.CurrentPasswd != "" {
+		params["currentpasswd"] = p.CurrentPasswd
+	}
+	if len(p.Usrgrps) > 0 {
+		params["usrgrps"] = p.Usrgrps
 
-	return params
-}
-
-type UserCreateParams struct {
-	UserName  string
-	Name      string
-	Passwd    string
-	Roleid    string
-	UserGroup string
-}
-
-func (P UserCreateParams) BuildParams() map[string]interface{} {
-	params := map[string]interface{}{}
-	if P.UserName != "" {
-		params["alias"] = P.UserName
-		params["username"] = P.UserName
-	}
-	if P.Name != "" {
-		params["name"] = P.Name
-	}
-	if P.Passwd != "" {
-		params["passwd"] = P.Passwd
-	}
-	if P.Roleid != "" {
-		params["roleid"] = P.Roleid
-	}
-	if P.UserGroup != "" {
-		params["usrgrps"] = []map[string]interface{}{{"usrgrpid": P.UserGroup}}
 	}
 	return params
 }

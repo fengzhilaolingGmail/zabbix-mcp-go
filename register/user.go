@@ -29,6 +29,17 @@ func registerUser(s *server.MCPServer) {
 		handler.CreateUsersHandler,
 	)
 	s.AddTool(
+		mcp.NewTool("update_user", mcp.WithDescription("更新Zabbix用户"),
+			mcp.WithString("instance", mcp.Required(), mcp.Description("Zabbix实例名称必须填")),
+			mcp.WithString("userid", mcp.Required(), mcp.Description("Zabbix用户ID")),
+			// mcp.WithString("surname", mcp.Description("用户姓氏")),
+			mcp.WithString("name", mcp.Description("用户名字")),
+			mcp.WithString("usrgrps", mcp.Description("用户组ID列表")),
+			mcp.WithBoolean("updatePasswd", mcp.Description("是否更新密码 默认: false")),
+		),
+		handler.UpdateUsersHandler,
+	)
+	s.AddTool(
 		mcp.NewTool("get_groups",
 			mcp.WithDescription("获取所有Zabbix用户组信息"),
 			mcp.WithString("instance", mcp.Required(), mcp.Description("Zabbix实例名称必须填")),

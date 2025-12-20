@@ -2,7 +2,7 @@
  * @Author: fengzhilaoling fengzhilaoling@gmail.com
  * @Date: 2025-12-18 11:10:11
  * @LastEditors: fengzhilaoling
- * @LastEditTime: 2025-12-20 16:11:53
+ * @LastEditTime: 2025-12-20 16:26:04
  * @FilePath: \zabbix-mcp-go\server\user.go
  * @Description: 用户相关功能
  * @Copyright: Copyright (c) 2025 by fengzhilaoling@gmail.com, All Rights Reserved.
@@ -78,6 +78,38 @@ func CreateUsers(ctx context.Context, provider zabbix.ClientProvider, spec model
 		return nil, callErr
 	}
 	users["passwd"] = passwd
+	return users, nil
+}
+
+func UpdateUser(ctx context.Context, provider zabbix.ClientProvider, spec models.ParamSpec, instance, passwd string) (map[string]interface{}, error) {
+	if provider == nil {
+		return nil, fmt.Errorf("no zabbix client")
+	}
+	var (
+		lease zabbix.ClientLease
+		err   error
+	)
+	if instance != "" {
+		lease, err = provider.AcquireByInstance(ctx, instance)
+	} else {
+		lease, err = provider.Acquire(ctx)
+	}
+	if err != nil {
+		return nil, err
+	}
+	var callErr error
+	defer func() { lease.Release(callErr) }()
+	client := lease.Client()
+	adapted := client.AdaptAPIParams("user.update", spec)
+	var users map[string]interface{}
+	callErr = client.Call(ctx, "user.update", adapted, &users)
+	if callErr != nil {
+		logger.L().Error("update user error: %s", callErr.Error())
+		return nil, callErr
+	}
+	if passwd != "" {
+		users["passwd"] = passwd
+	}
 	return users, nil
 }
 

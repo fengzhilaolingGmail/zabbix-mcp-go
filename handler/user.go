@@ -2,7 +2,7 @@
  * @Author: fengzhilaoling fengzhilaoling@gmail.com
  * @Date: 2025-12-18 10:49:35
  * @LastEditors: fengzhilaoling
- * @LastEditTime: 2025-12-20 15:06:38
+ * @LastEditTime: 2025-12-20 17:10:59
  * @FilePath: \zabbix-mcp-go\handler\user.go
  * @Description: 文件详情
  * @Copyright: Copyright (c) 2025 by fengzhilaoling@gmail.com, All Rights Reserved.
@@ -37,13 +37,13 @@ func GetUsersHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToo
 		return mcp.NewToolResultStructuredOnly(makeResult([]map[string]interface{}{})), nil
 	}
 	// 使用 server 层处理业务逻辑
-	spec := models.UserGetParams{Output: "extend"}
+	spec := models.UserParams{Output: "extend"}
 	if username != "" {
 		// 兼容低版本
 		spec.Alias = username
 		spec.Filter = map[string]interface{}{"username": username}
 		spec.GetAccess = true
-		spec.UserGroupIDs = []string{"usrgrpid", "name"}
+		spec.SelectUsrgrps = []string{"usrgrpid", "name"}
 	}
 	users, err := server.GetUsers(ctx, clientPool, spec, instanceName)
 	if err != nil {
@@ -84,7 +84,7 @@ func CreateUsersHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.Call
 		return nil, fmt.Errorf("生成密码失败: %w", err)
 	}
 	// 使用 server 层处理业务逻辑
-	spec := models.UserCreateParams{
+	spec := models.UserParams{
 		UserName:  username,
 		Name:      name,
 		Passwd:    passwd,
@@ -94,6 +94,63 @@ func CreateUsersHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.Call
 	users, err := server.CreateUsers(ctx, clientPool, spec, instanceName, passwd)
 	if err != nil {
 		return nil, fmt.Errorf("调用 user.create 失败: %w", err)
+	}
+	return mcp.NewToolResultStructuredOnly(makeResult(users)), nil
+}
+
+func UpdateUsersHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	instanceName := ""
+	name := ""
+	// surname := ""
+	userid := ""
+	usrgrps := []string{}
+	updatePasswd := false
+	passwd := ""
+	if args, ok := req.Params.Arguments.(map[string]interface{}); ok {
+		if v, ok2 := args["instance"].(string); ok2 {
+			instanceName = v
+		}
+		// if v, ok2 := args["surname"].(string); ok2 {
+		// 	surname = v
+		// }
+		if v, ok2 := args["name"].(string); ok2 {
+			name = v
+		}
+		if v, ok2 := args["usrgrps"].([]string); ok2 {
+			usrgrps = v
+		}
+		if v, ok2 := args["userid"].(string); ok2 {
+			userid = v
+		}
+		if v, ok2 := args["updatePasswd"].(bool); ok2 {
+			updatePasswd = v
+		}
+	}
+	if clientPool == nil {
+		return mcp.NewToolResultStructuredOnly(makeResult([]map[string]interface{}{})), nil
+	}
+	// 使用 server 层处理业务逻辑
+	spec := models.UserParams{Userid: userid}
+	// if surname != "" {
+	// 	spec.Surname = surname
+	// }
+	if name != "" {
+		spec.Name = name
+	}
+	if len(usrgrps) > 0 {
+		spec.Usrgrps = usrgrps
+	}
+	if updatePasswd {
+		passwd, err := utils.GenerateSecurePassword(12)
+		if err != nil {
+			return nil, fmt.Errorf("生成密码失败: %w", err)
+		}
+		spec.Passwd = passwd
+		spec.CurrentPasswd = passwd
+	}
+	users, err := server.UpdateUser(ctx, clientPool, spec, instanceName, passwd)
+	if err != nil {
+		return nil, fmt.Errorf("调用 user.update 失败: %w", err)
 	}
 	return mcp.NewToolResultStructuredOnly(makeResult(users)), nil
 }
