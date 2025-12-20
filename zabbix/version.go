@@ -2,7 +2,7 @@
  * @Author: fengzhilaoling fengzhilaoling@gmail.com
  * @Date: 2025-12-16 20:54:52
  * @LastEditors: fengzhilaoling
- * @LastEditTime: 2025-12-19 18:26:45
+ * @LastEditTime: 2025-12-20 13:16:30
  * @FilePath: \zabbix-mcp-go\zabbix\version.go
  * @Description: 版本检测相关功能
  * Copyright (c) 2025 by fengzhilaoling@gmail.com, All Rights Reserved.
@@ -171,7 +171,7 @@ func (vd *VersionDetector) GetDetailedVersionFeatures() map[string]interface{} {
 // AdaptAPIParams 根据版本适配API参数
 func (vd *VersionDetector) AdaptAPIParams(method string, spec models.ParamSpec) map[string]interface{} {
 	version, err := vd.DetectVersion(context.Background())
-
+	logger.L().Info(version.Full)
 	var params map[string]interface{}
 	if spec != nil {
 		params = spec.BuildParams()
@@ -196,9 +196,22 @@ func (vd *VersionDetector) AdaptAPIParams(method string, spec models.ParamSpec) 
 			delete(adaptedParams, "selectTags")
 			// adaptedParams["output"] = []string{"hostid", "name"}
 		}
-		// if version.Major > 5 {
-		// 	delete(adaptedParams, "filter[\"alias\"]")
-		// }
+	case "user.get":
+		if version.Major > 5 {
+			if f, ok := adaptedParams["filter"].(map[string]interface{}); ok {
+				delete(f, "alias")
+				if len(f) == 0 {
+					delete(adaptedParams, "filter")
+				}
+			}
+		} else {
+			if f, ok := adaptedParams["filter"].(map[string]interface{}); ok {
+				delete(f, "username")
+				if len(f) == 0 {
+					delete(adaptedParams, "filter")
+				}
+			}
+		}
 	case "item.get":
 		if version.Major < 4 {
 			delete(adaptedParams, "selectTags")

@@ -37,6 +37,8 @@ func GetUsersHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToo
 	// 使用 server 层处理业务逻辑
 	spec := models.UserGetParams{Output: "extend"}
 	if username != "" {
+		// 兼容低版本
+		spec.Alias = username
 		spec.Filter = map[string]interface{}{"username": username}
 	}
 	users, err := server.GetUsers(ctx, clientPool, spec, instanceName)
