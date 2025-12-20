@@ -2,7 +2,7 @@
  * @Author: fengzhilaoling fengzhilaoling@gmail.com
  * @Date: 2025-12-16 20:54:52
  * @LastEditors: fengzhilaoling
- * @LastEditTime: 2025-12-20 13:16:30
+ * @LastEditTime: 2025-12-20 14:12:24
  * @FilePath: \zabbix-mcp-go\zabbix\version.go
  * @Description: 版本检测相关功能
  * Copyright (c) 2025 by fengzhilaoling@gmail.com, All Rights Reserved.
@@ -196,6 +196,7 @@ func (vd *VersionDetector) AdaptAPIParams(method string, spec models.ParamSpec) 
 			delete(adaptedParams, "selectTags")
 			// adaptedParams["output"] = []string{"hostid", "name"}
 		}
+	// ========================= User API =========================
 	case "user.get":
 		if version.Major > 5 {
 			if f, ok := adaptedParams["filter"].(map[string]interface{}); ok {
@@ -212,6 +213,21 @@ func (vd *VersionDetector) AdaptAPIParams(method string, spec models.ParamSpec) 
 				}
 			}
 		}
+	case "user.create":
+		// Zabbix 5.x 及更早版本不使用 `username` 字段，使用 `alias`。
+		// 对于 6.x/7.x，使用 `username`。
+		if version.Major <= 5 {
+			if un, ok := adaptedParams["username"]; ok {
+				if s, ok2 := un.(string); ok2 {
+					adaptedParams["alias"] = s
+				}
+				delete(adaptedParams, "username")
+			}
+		} else {
+			// >=6: 尽量保留 username；如果只有 alias 提供也不会出错
+			delete(adaptedParams, "alias")
+		}
+	// ========================= Item API =========================
 	case "item.get":
 		if version.Major < 4 {
 			delete(adaptedParams, "selectTags")
@@ -225,19 +241,6 @@ func (vd *VersionDetector) AdaptAPIParams(method string, spec models.ParamSpec) 
 	case "template.get":
 		if version.Major < 5 {
 			delete(adaptedParams, "selectTags")
-		}
-	case "user.create":
-		// Zabbix 5.x 及更早版本不使用 `username` 字段，使用 `alias`。
-		// 对于 6.x/7.x，使用 `username`。
-		if version.Major <= 5 {
-			if un, ok := adaptedParams["username"]; ok {
-				if s, ok2 := un.(string); ok2 {
-					adaptedParams["alias"] = s
-				}
-				delete(adaptedParams, "username")
-			}
-		} else {
-			// >=6: 尽量保留 username；如果只有 alias 提供也不会出错
 		}
 	}
 

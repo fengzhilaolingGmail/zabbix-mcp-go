@@ -47,3 +47,33 @@ func GetUsers(ctx context.Context, provider zabbix.ClientProvider, spec models.P
 	}
 	return users, nil
 }
+
+
+func CreateUsers(ctx context.Context, provider zabbix.ClientProvider, spec models.ParamSpec, instance, passwd string) ([]map[string]interface{}, error) {
+	if provider == nil {
+		return nil, fmt.Errorf("no zabbix client")
+	}
+	var (
+		lease zabbix.ClientLease
+		err   error
+	)
+	if instance != "" {
+		lease, err = provider.AcquireByInstance(ctx, instance)
+	} else {
+		lease, err = provider.Acquire(ctx)
+	}
+	if err != nil {
+		return nil, err
+	}
+	var callErr error
+	defer func() { lease.Release(callErr) }()
+	client := lease.Client()
+	adapted := client.AdaptAPIParams("user.create", spec)
+	var users []map[string]interface{}
+	callErr = client.Call(ctx, "user.create", adapted, &users)
+	if callErr != nil {
+		return nil, callErr
+	}
+	users[0]["passwd"] = passwd
+	return users, nil
+}

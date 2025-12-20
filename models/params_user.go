@@ -102,3 +102,32 @@ func (p UserGetParams) BuildParams() map[string]interface{} {
 
 	return params
 }
+
+type UserCreateParams struct {
+	UserName  string
+	Name      string
+	Passwd    string
+	Roleid    string
+	UserGroup string
+}
+
+func (P UserCreateParams) BuildParams() map[string]interface{} {
+	params := map[string]interface{}{}
+	if P.UserName != "" {
+		params["alias"] = P.UserName
+		params["username"] = P.UserName
+	}
+	if P.Name != "" {
+		params["name"] = P.Name
+	}
+	if P.Passwd != "" {
+		params["passwd"] = P.Passwd
+	}
+	if P.Roleid != "" {
+		params["roleid"] = P.Roleid
+	}
+	if P.UserGroup != "" {
+		params["usrgrps"] = []map[string]interface{}{{"usrgrpid": P.UserGroup}}
+	}
+	return params
+}

@@ -18,4 +18,14 @@ func registerUser(s *server.MCPServer) {
 		),
 		handler.GetUsersHandler,
 	)
+	s.AddTool(
+		mcp.NewTool("create_user", mcp.WithDescription("创建Zabbix用户"),
+			mcp.WithString("instance", mcp.Required(), mcp.Description("Zabbix实例名称必须填")),
+			mcp.WithString("username", mcp.Required(), mcp.Description("Zabbix用户名")),
+			mcp.WithString("name", mcp.Description("用户真实姓名")),
+			mcp.WithString("userGroup", mcp.Required(), mcp.Description("用户组ID")),
+			mcp.WithString("roleID", mcp.Description("角色ID")),
+		),
+		handler.CreateUsersHandler,
+	)
 }
