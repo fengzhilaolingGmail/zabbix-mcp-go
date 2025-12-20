@@ -1,3 +1,12 @@
+/*
+ * @Author: fengzhilaoling fengzhilaoling@gmail.com
+ * @Date: 2025-12-16 20:14:53
+ * @LastEditors: fengzhilaoling
+ * @LastEditTime: 2025-12-20 20:22:12
+ * @FilePath: \zabbix-mcp-go\logger\logger.go
+ * @Description: 文件解释
+ * Copyright (c) 2025 by fengzhilaoling@gmail.com, All Rights Reserved.
+ */
 package logger
 
 import (

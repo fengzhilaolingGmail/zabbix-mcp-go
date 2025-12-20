@@ -1,3 +1,12 @@
+/*
+ * @Author: fengzhilaoling fengzhilaoling@gmail.com
+ * @Date: 2025-12-18 22:03:59
+ * @LastEditors: fengzhilaoling
+ * @LastEditTime: 2025-12-20 20:22:06
+ * @FilePath: \zabbix-mcp-go\models\params_base.go
+ * @Description: 文件解释
+ * Copyright (c) 2025 by fengzhilaoling@gmail.com, All Rights Reserved.
+ */
 package models
 
 // ParamSpec 用于描述一个方法的业务参数，由具体实现转换成 Zabbix API 所需的 map

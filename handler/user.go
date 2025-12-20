@@ -2,7 +2,7 @@
  * @Author: fengzhilaoling fengzhilaoling@gmail.com
  * @Date: 2025-12-18 10:49:35
  * @LastEditors: fengzhilaoling
- * @LastEditTime: 2025-12-20 17:10:59
+ * @LastEditTime: 2025-12-20 20:09:20
  * @FilePath: \zabbix-mcp-go\handler\user.go
  * @Description: 文件详情
  * @Copyright: Copyright (c) 2025 by fengzhilaoling@gmail.com, All Rights Reserved.
