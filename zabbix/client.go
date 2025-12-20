@@ -3,8 +3,8 @@
   - @Date: 2025-12-16 20:19:03
     }
 
-* @LastEditTime: 2025-12-19 18:32:03
-* @FilePath: \zabbix-mcp-go\zabbix\client.go
+ * @LastEditTime: 2025-12-20 16:04:52
+ * @FilePath: \zabbix-mcp-go\zabbix\client.go
   - @Description: Zabbix客户端相关功能
   - Copyright (c) 2025 by fengzhilaoling@gmail.com, All Rights Reserved.
 */
@@ -152,6 +152,7 @@ func (c *ZabbixClient) Call(ctx context.Context, method string, params interface
 	logger.L().Infof("call method:%s, params:%v, result:%v", method, params, result)
 	payload, err := c.call(ctx, method, params, authToken)
 	if err != nil {
+		logger.L().Errorf("call method: %s Failed, err: %v", method, err)
 		if isAuthError(err) && c.getAuthType() != "token" {
 			if err := c.Login(ctx); err != nil {
 				return err
@@ -163,7 +164,6 @@ func (c *ZabbixClient) Call(ctx context.Context, method string, params interface
 			return err
 		}
 	}
-
 	if result == nil {
 		return nil
 	}
