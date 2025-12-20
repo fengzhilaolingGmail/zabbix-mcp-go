@@ -28,4 +28,16 @@ func registerUser(s *server.MCPServer) {
 		),
 		handler.CreateUsersHandler,
 	)
+	s.AddTool(
+		mcp.NewTool("get_groups",
+			mcp.WithDescription("获取所有Zabbix用户组信息"),
+			mcp.WithString("instance", mcp.Required(), mcp.Description("Zabbix实例名称必须填")),
+			mcp.WithString("name", mcp.Description("用户组名称")),
+			mcp.WithString("status", mcp.Description("用户组状态: 0启用 1禁用 默认: 0")),
+			mcp.WithBoolean("selectUsers", mcp.Description("是否获取用户组下用户列表 默认: false")),
+			mcp.WithBoolean("selectRights", mcp.Description("是否获取用户组权限列表 默认: false")),
+			mcp.WithBoolean("selectTagFilters", mcp.Description("是否获取用户组标签过滤器列表 默认: false")),
+		),
+		handler.GetUserGroupsHandler,
+	)
 }

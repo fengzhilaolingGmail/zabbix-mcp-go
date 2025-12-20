@@ -2,7 +2,7 @@
  * @Author: fengzhilaoling fengzhilaoling@gmail.com
  * @Date: 2025-12-16 20:54:52
  * @LastEditors: fengzhilaoling
- * @LastEditTime: 2025-12-20 14:12:24
+ * @LastEditTime: 2025-12-20 15:25:16
  * @FilePath: \zabbix-mcp-go\zabbix\version.go
  * @Description: 版本检测相关功能
  * Copyright (c) 2025 by fengzhilaoling@gmail.com, All Rights Reserved.
@@ -223,9 +223,44 @@ func (vd *VersionDetector) AdaptAPIParams(method string, spec models.ParamSpec) 
 				}
 				delete(adaptedParams, "username")
 			}
+			delete(adaptedParams, "roleid")
 		} else {
 			// >=6: 尽量保留 username；如果只有 alias 提供也不会出错
 			delete(adaptedParams, "alias")
+		}
+	case "usergroup.get":
+		if version.Major < 6 {
+			if v, ok := adaptedParams["selectUsers"]; ok {
+				if fields, ok := v.([]string); ok {
+					filtered := fields[:0] // 复用底层数组
+					for _, f := range fields {
+						if f != "username" {
+							filtered = append(filtered, f)
+						}
+					}
+					if len(filtered) == 0 {
+						delete(adaptedParams, "selectUsers")
+					} else {
+						adaptedParams["selectUsers"] = filtered
+					}
+				}
+			}
+		} else {
+			if v, ok := adaptedParams["selectUsers"]; ok {
+				if fields, ok := v.([]string); ok {
+					filtered := fields[:0] // 复用底层数组
+					for _, f := range fields {
+						if f != "alias" {
+							filtered = append(filtered, f)
+						}
+					}
+					if len(filtered) == 0 {
+						delete(adaptedParams, "selectUsers")
+					} else {
+						adaptedParams["selectUsers"] = filtered
+					}
+				}
+			}
 		}
 	// ========================= Item API =========================
 	case "item.get":
