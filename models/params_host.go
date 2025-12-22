@@ -21,3 +21,10 @@ func (p HostGetParams) BuildParams() map[string]interface{} {
 	}
 	return params
 }
+
+func (p HostGetParams) BuildDeleteParams() []string {
+	if len(p.HostIDs) > 0 {
+		return append([]string(nil), p.HostIDs...)
+	}
+	return nil
+}

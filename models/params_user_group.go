@@ -2,7 +2,7 @@
  * @Author: fengzhilaoling fengzhilaoling@gmail.com
  * @Date: 2025-12-20 17:18:27
  * @LastEditors: fengzhilaoling
- * @LastEditTime: 2025-12-20 17:18:52
+ * @LastEditTime: 2025-12-22 14:48:46
  * @FilePath: \zabbix-mcp-go\models\params_user_group.go
  * @Description: 用户组参数
  * @Copyright: Copyright (c) 2025 by fengzhilaoling@gmail.com, All Rights Reserved.
@@ -11,6 +11,7 @@ package models
 
 type UserGroup struct {
 	Name             string
+	Groupids         []string
 	GroupPer         map[int]int
 	templatePer      map[int]int
 	TagFilters       []string
@@ -63,4 +64,12 @@ func (P UserGroup) BuildParams() map[string]interface{} {
 		params["selectTagFilters"] = []string{"tag", "value"}
 	}
 	return params
+}
+
+func (p UserGroup) BuildDeleteParams() []string {
+	if len(p.Groupids) > 0 {
+		return append([]string(nil), p.Groupids...)
+
+	}
+	return nil
 }

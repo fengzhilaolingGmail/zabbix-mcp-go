@@ -24,7 +24,6 @@ func GetHostsHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToo
 	if clientPool == nil {
 		return mcp.NewToolResultStructuredOnly(makeResult([]map[string]interface{}{})), nil
 	}
-
 	spec := models.HostGetParams{Output: "extend"}
 	hosts, err := server.GetHosts(ctx, clientPool, spec)
 	if err != nil {

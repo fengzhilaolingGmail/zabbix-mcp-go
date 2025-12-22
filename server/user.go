@@ -2,7 +2,7 @@
  * @Author: fengzhilaoling fengzhilaoling@gmail.com
  * @Date: 2025-12-18 11:10:11
  * @LastEditors: fengzhilaoling
- * @LastEditTime: 2025-12-22 13:35:15
+ * @LastEditTime: 2025-12-22 15:59:56
  * @FilePath: \zabbix-mcp-go\server\user.go
  * @Description: 用户相关功能
  * @Copyright: Copyright (c) 2025 by fengzhilaoling@gmail.com, All Rights Reserved.
@@ -156,6 +156,41 @@ func DisableUser(ctx context.Context, provider zabbix.ClientProvider, userId, in
 	if err != nil {
 		logger.L().Error("禁用用户失败: %s", err.Error())
 		return nil, err
+	}
+	return users, nil
+}
+
+// 删除用户
+func DeleteUsers(ctx context.Context, provider zabbix.ClientProvider, spec models.ParamSpec, instance string) (map[string]interface{}, error) {
+	if provider == nil {
+		return nil, fmt.Errorf("no zabbix client")
+	}
+	var (
+		lease zabbix.ClientLease
+		err   error
+	)
+	if instance != "" {
+		lease, err = provider.AcquireByInstance(ctx, instance)
+	} else {
+		lease, err = provider.Acquire(ctx)
+	}
+	if err != nil {
+		return nil, err
+	}
+	var callErr error
+	defer func() { lease.Release(callErr) }()
+	client := lease.Client()
+
+	deleteIDs := spec.BuildDeleteParams()
+	if len(deleteIDs) == 0 {
+		return nil, fmt.Errorf("user.delete 需要至少一个 userid")
+	}
+
+	var users map[string]interface{}
+	callErr = client.Call(ctx, "user.delete", deleteIDs, &users)
+	if callErr != nil {
+		logger.L().Error("delete user error: %s", callErr.Error())
+		return nil, callErr
 	}
 	return users, nil
 }

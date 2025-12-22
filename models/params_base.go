@@ -15,6 +15,7 @@ package models
 
 type ParamSpec interface {
 	BuildParams() map[string]interface{}
+	BuildDeleteParams() []string
 }
 
 // MapParams 允许沿用 map[string]interface{} 的方式，同时实现 ParamSpec 接口
@@ -27,4 +28,8 @@ func (m MapParams) BuildParams() map[string]interface{} {
 		cloned[k] = v
 	}
 	return cloned
+}
+
+func (m MapParams) BuildDeleteParams() []string {
+	return []string{}
 }

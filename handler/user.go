@@ -2,7 +2,7 @@
  * @Author: fengzhilaoling fengzhilaoling@gmail.com
  * @Date: 2025-12-18 10:49:35
  * @LastEditors: fengzhilaoling
- * @LastEditTime: 2025-12-22 12:58:54
+ * @LastEditTime: 2025-12-22 16:04:23
  * @FilePath: \zabbix-mcp-go\handler\user.go
  * @Description: 文件详情
  * @Copyright: Copyright (c) 2025 by fengzhilaoling@gmail.com, All Rights Reserved.
@@ -13,6 +13,7 @@ import (
 	"context"
 	"fmt"
 
+	"zabbixMcp/logger"
 	"zabbixMcp/models"
 	"zabbixMcp/server"
 	"zabbixMcp/utils"
@@ -173,6 +174,36 @@ func DisableUserHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.Call
 	users, err := server.DisableUser(ctx, clientPool, userid, instanceName)
 	if err != nil {
 		return nil, fmt.Errorf("调用 user.disable 失败: %w", err)
+	}
+	return mcp.NewToolResultStructuredOnly(makeResult(users)), nil
+}
+
+func DeleteUsersHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	instanceName := ""
+	userIDs := []string{}
+	if args, ok := req.Params.Arguments.(map[string]interface{}); ok {
+		if v, ok2 := args["instance"].(string); ok2 {
+			instanceName = v
+		}
+		if arr, ok := args["userids"].([]interface{}); ok {
+			for _, v := range arr {
+				if s, ok := v.(string); ok && s != "" {
+					userIDs = append(userIDs, s)
+				}
+			}
+		}
+		if v, ok := args["userid"].(string); ok && v != "" {
+			userIDs = append(userIDs, v)
+		}
+	}
+	if clientPool == nil {
+		return mcp.NewToolResultStructuredOnly(makeResult([]map[string]interface{}{})), nil
+	}
+	spec := models.UserParams{UserIDs: userIDs}
+	users, err := server.DeleteUsers(ctx, clientPool, spec, instanceName)
+	if err != nil {
+		logger.L().Errorf("调用 user.delete 失败: %w", err)
+		return nil, fmt.Errorf("调用 user.delete 失败: %w", err)
 	}
 	return mcp.NewToolResultStructuredOnly(makeResult(users)), nil
 }

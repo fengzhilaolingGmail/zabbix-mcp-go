@@ -46,4 +46,11 @@ func registerUser(s *server.MCPServer) {
 		),
 		handler.DisableUserHandler,
 	)
+	s.AddTool(
+		mcp.NewTool("delete_user", mcp.WithDescription("删除Zabbix用户"),
+			mcp.WithString("instance", mcp.Required(), mcp.Description("Zabbix实例名称必须填")),
+			mcp.WithArray("userids", mcp.Required(), mcp.Description("Zabbix用户ID列表")),
+		),
+		handler.DeleteUsersHandler,
+	)
 }
