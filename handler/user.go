@@ -2,7 +2,7 @@
  * @Author: fengzhilaoling fengzhilaoling@gmail.com
  * @Date: 2025-12-18 10:49:35
  * @LastEditors: fengzhilaoling
- * @LastEditTime: 2025-12-20 20:09:20
+ * @LastEditTime: 2025-12-22 12:58:54
  * @FilePath: \zabbix-mcp-go\handler\user.go
  * @Description: 文件详情
  * @Copyright: Copyright (c) 2025 by fengzhilaoling@gmail.com, All Rights Reserved.
@@ -150,6 +150,29 @@ func UpdateUsersHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.Call
 	users, err := server.UpdateUser(ctx, clientPool, spec, instanceName, passwd)
 	if err != nil {
 		return nil, fmt.Errorf("调用 user.update 失败: %w", err)
+	}
+	return mcp.NewToolResultStructuredOnly(makeResult(users)), nil
+}
+
+func DisableUserHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	instanceName := ""
+	userid := ""
+	// surname := ""
+	if args, ok := req.Params.Arguments.(map[string]interface{}); ok {
+		if v, ok2 := args["instance"].(string); ok2 {
+			instanceName = v
+		}
+		if v, ok2 := args["userid"].(string); ok2 {
+			userid = v
+		}
+	}
+	if clientPool == nil {
+		return mcp.NewToolResultStructuredOnly(makeResult([]map[string]interface{}{})), nil
+	}
+
+	users, err := server.DisableUser(ctx, clientPool, userid, instanceName)
+	if err != nil {
+		return nil, fmt.Errorf("调用 user.disable 失败: %w", err)
 	}
 	return mcp.NewToolResultStructuredOnly(makeResult(users)), nil
 }

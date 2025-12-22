@@ -2,7 +2,7 @@
  * @Author: fengzhilaoling fengzhilaoling@gmail.com
  * @Date: 2025-12-18 11:10:11
  * @LastEditors: fengzhilaoling
- * @LastEditTime: 2025-12-20 16:26:04
+ * @LastEditTime: 2025-12-22 13:35:15
  * @FilePath: \zabbix-mcp-go\server\user.go
  * @Description: 用户相关功能
  * @Copyright: Copyright (c) 2025 by fengzhilaoling@gmail.com, All Rights Reserved.
@@ -16,6 +16,7 @@ import (
 
 	"zabbixMcp/logger"
 	"zabbixMcp/models"
+	"zabbixMcp/utils"
 	"zabbixMcp/zabbix"
 )
 
@@ -113,4 +114,48 @@ func UpdateUser(ctx context.Context, provider zabbix.ClientProvider, spec models
 	return users, nil
 }
 
-// 删除用户
+// 禁用用户
+func DisableUser(ctx context.Context, provider zabbix.ClientProvider, userId, instance string) (map[string]interface{}, error) {
+	// 群组设置为：No access to the frontend
+	// 查找No access to the frontend 群组id
+	groupSpec := models.UserGroup{
+		Output: "extend",
+		Status: 0,
+		Filter: map[string]interface{}{"name": "No access to the frontend"},
+	}
+	groups, err := GetUserGroups(ctx, provider, groupSpec, instance)
+	if err != nil {
+		logger.L().Error("获取\"No access to the frontend\"用户组失败: %s", err.Error())
+		return nil, err
+	}
+	if len(groups) == 0 {
+		return nil, fmt.Errorf("未找到 \"No access to the frontend\" 用户组")
+	}
+	fmt.Println(groups)
+	var targetGroupID string
+	for _, g := range groups {
+		if id, ok := g["usrgrpid"].(string); ok && id != "" {
+			targetGroupID = id
+			break
+		}
+	}
+	if targetGroupID == "" {
+		return nil, fmt.Errorf("用户组数据缺少 usrgrpid")
+	}
+	logger.L().Infof("禁用用户: %s, 加入用户组: %s", userId, targetGroupID)
+	var userSpec models.UserParams
+	userSpec.Userid = userId
+	userSpec.Usrgrps = []string{targetGroupID}
+	pwd, err := utils.GenerateSecurePassword(12) // 密码无需回传
+	if err != nil {
+		logger.L().Error("生成密码失败: %s", err.Error())
+		return nil, err
+	}
+	// TODO 设置
+	users, err := UpdateUser(ctx, provider, userSpec, instance, pwd)
+	if err != nil {
+		logger.L().Error("禁用用户失败: %s", err.Error())
+		return nil, err
+	}
+	return users, nil
+}

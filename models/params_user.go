@@ -2,7 +2,7 @@
  * @Author: fengzhilaoling fengzhilaoling@gmail.com
  * @Date: 2025-12-19 09:10:52
  * @LastEditors: fengzhilaoling
- * @LastEditTime: 2025-12-20 17:19:28
+ * @LastEditTime: 2025-12-22 13:20:12
  * @FilePath: \zabbix-mcp-go\models\params_user.go
  * @Description: 用户参数
  * @Copyright: Copyright (c) 2025 by fengzhilaoling@gmail.com, All Rights Reserved.
@@ -130,8 +130,17 @@ func (p UserParams) BuildParams() map[string]interface{} {
 		params["currentpasswd"] = p.CurrentPasswd
 	}
 	if len(p.Usrgrps) > 0 {
-		params["usrgrps"] = p.Usrgrps
-
+		var groups []map[string]interface{}
+		if existing, ok := params["usrgrps"]; ok {
+			if typed, ok := existing.([]map[string]interface{}); ok {
+				groups = append(groups, typed...)
+			}
+		}
+		groups = append(groups, make([]map[string]interface{}, 0, len(p.Usrgrps))...)
+		for _, v := range p.Usrgrps {
+			groups = append(groups, map[string]interface{}{"usrgrpid": v})
+		}
+		params["usrgrps"] = groups
 	}
 	return params
 }

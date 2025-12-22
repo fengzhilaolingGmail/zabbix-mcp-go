@@ -39,4 +39,11 @@ func registerUser(s *server.MCPServer) {
 		),
 		handler.UpdateUsersHandler,
 	)
+	s.AddTool(
+		mcp.NewTool("disable_user", mcp.WithDescription("禁用Zabbix用户"),
+			mcp.WithString("instance", mcp.Required(), mcp.Description("Zabbix实例名称必须填")),
+			mcp.WithString("userid", mcp.Required(), mcp.Description("Zabbix用户ID")),
+		),
+		handler.DisableUserHandler,
+	)
 }
