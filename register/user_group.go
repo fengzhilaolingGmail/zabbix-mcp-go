@@ -2,7 +2,7 @@
  * @Author: fengzhilaoling fengzhilaoling@gmail.com
  * @Date: 2025-12-20 17:13:46
  * @LastEditors: fengzhilaoling
- * @LastEditTime: 2025-12-23 19:45:28
+ * @LastEditTime: 2025-12-23 20:07:23
  * @FilePath: \zabbix-mcp-go\register\user_group.go
  * @Description: 用户组功能注册
  * @Copyright: Copyright (c) 2025 by fengzhilaoling@gmail.com, All Rights Reserved.
@@ -28,6 +28,7 @@ func registerUserGroup(s *server.MCPServer) {
 		),
 		handler.GetUserGroupsHandler,
 	)
+	// TODO  hostgroup_rights templategroup_rights tag_filters 功能需测试
 	s.AddTool(
 		mcp.NewTool("create_group", mcp.WithDescription("创建Zabbix用户组"),
 			mcp.WithString("instance", mcp.Required(), mcp.Description("Zabbix实例名称必须填")),
