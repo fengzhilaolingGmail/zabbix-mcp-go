@@ -16,6 +16,8 @@
 
 > ✅ 上述工具均已在 `register/` 下完成注册，可直接通过 MCP Server 暴露给客户端。
 
+> **其他功能补充中** 
+
 ## 🧩 架构速览
 
 - **配置解析 (`config.go`)**：从 `config.yml` 读取多个 Zabbix 实例，支持密码/Token 双认证以及默认实例标记。
@@ -80,6 +82,60 @@ go test ./...
 - 日志默认输出在控制台，如需文件输出可扩展 `logger/logger.go`。
 - 所有 API 调用均带有“调用方法 + 参数 + 错误”日志，便于追踪。
 
+### Cursor / VS Code 集成配置
+
+> 以下示例均以 Windows 为例，路径可按需替换为自己的工作目录或用户目录。
+
+#### Cursor（支持 stdio / SSE 双模式）
+
+1. 打开 Cursor → `Settings` → `MCP Servers`，或直接编辑 `C:\Users\<you>\AppData\Roaming\Cursor\User\globalStorage\state.mcp.json`。
+2. 根据需要添加下列配置：
+
+| 模式 | 运行命令 | Cursor 配置片段 |
+|------|-----------|------------------|
+| stdio | `D:\go_code\zabbix-mcp-go\zabbixMcp.exe -stdio` | ```json
+{
+  "name": "zabbix-mcp-stdio",
+  "type": "stdio",
+  "command": "D:/go_code/zabbix-mcp-go/zabbixMcp.exe",
+  "args": ["-stdio"],
+  "cwd": "D:/go_code/zabbix-mcp-go"
+}
+``` |
+| SSE/HTTP | `D:\go_code\zabbix-mcp-go\zabbixMcp.exe -http -port 5443` | ```json
+{
+  "name": "zabbix-mcp-sse",
+  "type": "sse",
+  "url": "http://127.0.0.1:5443/sse",
+  "registrationUrl": "http://127.0.0.1:5443/openapi.json"
+}
+``` |
+
+3. 保存后在 Cursor 的 “Available MCP Servers” 中启用即可；SSE 模式下需保持服务常驻监听。
+
+#### VS Code / GitHub Copilot Chat（Insiders 构建）
+
+1. 确保安装最新版 VS Code + Copilot Chat，并启用实验性的 MCP 支持（`"github.copilot.chat.enableMcp": true`）。
+2. 在 VS Code 用户设置（`settings.json`）中添加：
+
+```json
+"github.copilot.mcpServers": {
+  "zabbix-mcp-stdio": {
+    "type": "stdio",
+    "command": "D:/go_code/zabbix-mcp-go/zabbixMcp.exe",
+    "args": ["-stdio"],
+    "cwd": "D:/go_code/zabbix-mcp-go"
+  },
+  "zabbix-mcp-sse": {
+    "type": "sse",
+    "url": "http://127.0.0.1:5443/sse",
+    "registrationUrl": "http://127.0.0.1:5443/openapi.json"
+  }
+}
+```
+
+3. 重启 VS Code 或重新加载窗口后，即可在 Copilot 侧边栏的 MCP 工具列表中看到 `zabbix-mcp-*`，并在对话中通过 `@zabbix-mcp-stdio` 等方式直接调用。
+
 ## 📁 目录概览
 
 ```
@@ -94,6 +150,19 @@ go test ./...
 ├── main.go             # 程序入口，负责启动 MCP server
 └── README.md           # 当前文档
 ```
+
+
+## ❤️ 支持项目 / 赞助
+
+如果这个项目在你的日常运维或自动化工作中带来了帮助，欢迎通过扫码赞助支持持续维护：
+
+| 渠道 | 收款码 |
+|------|--------|
+| 微信 | ![WeChat Pay](docs/sponsor-wechat.jpg "将你的微信收款码命名为 sponsor-wechat.png 放入 docs/ 目录") |
+| 支付宝 | ![Alipay](docs/sponsor-alipay.jpg "将你的支付宝收款码命名为 sponsor-alipay.png 放入 docs/ 目录") |
+
+> 也可以直接联系作者添加其他渠道，或在 PR/Issue 中留言。感谢支持！
+
 
 ## 📌 后续展望
 
