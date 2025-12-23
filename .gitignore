@@ -33,4 +33,4 @@ go.work.sum
 .history/
 logs/
 *.log
-
+config.yml
