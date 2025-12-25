@@ -2,9 +2,9 @@
  * @Author: fengzhilaoling fengzhilaoling@gmail.com
  * @Date: 2025-12-18 10:06:45
  * @LastEditors: fengzhilaoling
- * @LastEditTime: 2025-12-20 17:15:25
+ * @LastEditTime: 2025-12-24 09:55:56
  * @FilePath: \zabbix-mcp-go\register\register.go
- * @Description: 文件详情
+ * @Description: mcp注册中心
  * @Copyright: Copyright (c) 2025 by fengzhilaoling@gmail.com, All Rights Reserved.
  */
 package register
@@ -18,4 +18,5 @@ func Registers(s *server.MCPServer) {
 	registerInstances(s)
 	registerUser(s)
 	registerUserGroup(s)
+	registerHost(s)
 }

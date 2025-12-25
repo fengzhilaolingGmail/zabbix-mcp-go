@@ -68,6 +68,8 @@ func CreateUserGroup(ctx context.Context, provider zabbix.ClientProvider, spec m
 	return userGroups, nil
 }
 
-// 更新用户组
+// TODO更新用户组
 
-// 删除用户组
+// TODO 启用禁用 & 调试模式支持
+
+// TODO删除用户组
