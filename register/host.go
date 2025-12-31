@@ -12,6 +12,8 @@ func registerHost(s *server.MCPServer) {
 		mcp.NewTool("get_hosts",
 			mcp.WithDescription("获取实例Zabbix主机信息,支持所有或模糊匹配"),
 			mcp.WithString("instance", mcp.Required(), mcp.Description("Zabbix实例名称必须填")),
+			mcp.WithString("active_available", mcp.Description("主机状态,0-未知,1-在线,2-离线,默认为1")),
+			mcp.WithString("type", mcp.Description("主机类型,1 - Agent 2 - SNMP 3 - IPMI 4 - JMX,默认为1")),
 		),
 		handler.GetHostsHandler,
 	)

@@ -2,7 +2,7 @@
  * @Author: fengzhilaoling fengzhilaoling@gmail.com
  * @Date: 2025-12-18 11:20:36
  * @LastEditors: fengzhilaoling
- * @LastEditTime: 2025-12-26 17:56:29
+ * @LastEditTime: 2025-12-31 16:44:42
  * @FilePath: \zabbix-mcp-go\handler\host.go
  * @Description: 文件详情
  * @Copyright: Copyright (c) 2025 by fengzhilaoling@gmail.com, All Rights Reserved.
@@ -24,6 +24,8 @@ import (
 func GetHostsHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	instance := ""
 	hostnames := []string{}
+	activeAvailable := ""
+	typezbx := "1"
 	selectParams := map[string]bool{
 		"select_discoveries":              false,
 		"select_discovery_data":           false,
@@ -57,6 +59,12 @@ func GetHostsHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToo
 				}
 			}
 		}
+		if v, ok := args["active_available"].(string); ok {
+			activeAvailable = v
+		}
+		if v, ok := args["type"].(string); ok {
+			typezbx = v
+		}
 		for key := range selectParams {
 			if val, ok := args[key].(bool); ok {
 				selectParams[key] = val
@@ -67,6 +75,9 @@ func GetHostsHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToo
 		return mcp.NewToolResultStructuredOnly(makeResult([]map[string]interface{}{})), nil
 	}
 	spec := models.HostParams{Output: "extend", SelectInterfaces: "extend"}
+	if activeAvailable != "" {
+		spec.Filter = map[string]interface{}{"active_available": activeAvailable, "type": typezbx}
+	}
 	logger.L().Infof("instance: %s, hostname: %v", instance, hostnames)
 	if len(hostnames) > 0 {
 		if selectParams["search"] {
