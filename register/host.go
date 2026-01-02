@@ -1,3 +1,12 @@
+/*
+ * @Author: fengzhilaoling fengzhilaoling@gmail.com
+ * @Date: 2026-01-02 15:33:32
+ * @LastEditors: fengzhilaoling
+ * @LastEditTime: 2026-01-02 16:33:48
+ * @FilePath: \zabbix-mcp-go\register\host.go
+ * @Description: 文件解释
+ * Copyright (c) 2026 by fengzhilaoling@gmail.com, All Rights Reserved.
+ */
 package register
 
 import (

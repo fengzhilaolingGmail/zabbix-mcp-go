@@ -4,7 +4,7 @@
  * @LastEditors: fengzhilaoling
  * @LastEditTime: 2025-12-31 16:44:42
  * @FilePath: \zabbix-mcp-go\handler\host.go
- * @Description: 文件详情
+ * @Description: 主机相关功能
  * @Copyright: Copyright (c) 2025 by fengzhilaoling@gmail.com, All Rights Reserved.
  */
 package handler
