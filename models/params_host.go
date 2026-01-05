@@ -1,6 +1,23 @@
 package models
 
 type HostParams struct {
+	// Basic create fields
+	Host string // host：用于 host.create，技术主机名（必填）
+	Name string // name：用于 host.create，可见名称
+	// Create-time fields
+	Groups          []map[string]interface{} // groups：用于 host.create，数组或对象，主机组必须只包含 groupid 字段
+	Interfaces      []map[string]interface{} // interfaces：用于 host.create，必须提供接口定义
+	TagsToCreate    []map[string]interface{} // tags：用于 host.create，主机标签
+	TemplatesToLink []map[string]interface{} // templates：用于 host.create 或 update，模板对象应仅包含 templateid
+	MacrosToCreate  []map[string]interface{} // macros：用于 host.create，用户宏定义
+	Inventory       map[string]interface{}   // inventory：用于 host.create/update，主机资产清单
+	// Replace-time fields (用于 update 替换当前对象，未在请求中列出的将被移除)
+	GroupsReplace                 []map[string]interface{} // groups：用于替换主机所属主机组，主机组必须只包含 groupid 字段
+	InterfacesReplace             []map[string]interface{} // interfaces：用于替换主机接口，请求中未列出的接口将被移除
+	TagsReplace                   []map[string]interface{} // tags：用于替换主机标签，请求中未列出的标签将被移除
+	TemplatesReplace              []map[string]interface{} // templates：用于替换关联模板，模板对象应仅包含 templateid
+	TemplatesClear                []map[string]interface{} // templates_clear：用于从主机中解除并清除模板，模板对象仅包含 templateid
+	MacrosReplace                 []map[string]interface{} // macros：用于替换用户宏，请求中未列出的宏将被删除
 	GroupIDs                      []string                 // groupids：仅返回属于指定主机组的主机
 	DServiceIDs                   []string                 // dserviceids：仅返回与指定发现服务相关的主机
 	GraphIDs                      []string                 // graphids：仅返回包含指定图形的主机
@@ -154,7 +171,8 @@ func (p HostParams) BuildParams() map[string]interface{} {
 	if p.Severities != nil {
 		params["severities"] = p.Severities
 	}
-	if len(p.Tags) > 0 {
+	// For host.get filter tags (only used when TagsToCreate is not set)
+	if len(p.Tags) > 0 && len(p.TagsToCreate) == 0 {
 		tags := make([]map[string]interface{}, 0, len(p.Tags))
 		for _, tag := range p.Tags {
 			if tag == nil {
@@ -268,6 +286,205 @@ func (p HostParams) BuildParams() map[string]interface{} {
 	}
 	if p.Output != nil {
 		params["output"] = p.Output
+	}
+	// host.create specific basic fields
+	if p.Host != "" {
+		params["host"] = p.Host
+	}
+	if p.Name != "" {
+		params["name"] = p.Name
+	}
+
+	// Create/update specific fields
+	// For replace semantics prefer Replace fields when provided (used by update)
+	if len(p.GroupsReplace) > 0 {
+		groups := make([]map[string]interface{}, 0, len(p.GroupsReplace))
+		for _, g := range p.GroupsReplace {
+			if g == nil {
+				continue
+			}
+			copied := make(map[string]interface{})
+			if v, ok := g["groupid"]; ok {
+				copied["groupid"] = v
+			}
+			if len(copied) > 0 {
+				groups = append(groups, copied)
+			}
+		}
+		if len(groups) > 0 {
+			params["groups"] = groups
+		}
+	} else if len(p.Groups) > 0 {
+		groups := make([]map[string]interface{}, 0, len(p.Groups))
+		for _, g := range p.Groups {
+			if g == nil {
+				continue
+			}
+			copied := make(map[string]interface{})
+			if v, ok := g["groupid"]; ok {
+				copied["groupid"] = v
+			}
+			if len(copied) > 0 {
+				groups = append(groups, copied)
+			}
+		}
+		if len(groups) > 0 {
+			params["groups"] = groups
+		}
+	}
+	if len(p.InterfacesReplace) > 0 {
+		interfaces := make([]map[string]interface{}, 0, len(p.InterfacesReplace))
+		for _, it := range p.InterfacesReplace {
+			if it == nil {
+				continue
+			}
+			copied := make(map[string]interface{}, len(it))
+			for k, v := range it {
+				copied[k] = v
+			}
+			interfaces = append(interfaces, copied)
+		}
+		if len(interfaces) > 0 {
+			params["interfaces"] = interfaces
+		}
+	} else if len(p.Interfaces) > 0 {
+		interfaces := make([]map[string]interface{}, 0, len(p.Interfaces))
+		for _, it := range p.Interfaces {
+			if it == nil {
+				continue
+			}
+			copied := make(map[string]interface{}, len(it))
+			for k, v := range it {
+				copied[k] = v
+			}
+			interfaces = append(interfaces, copied)
+		}
+		if len(interfaces) > 0 {
+			params["interfaces"] = interfaces
+		}
+	}
+	if len(p.TagsReplace) > 0 {
+		tags := make([]map[string]interface{}, 0, len(p.TagsReplace))
+		for _, tag := range p.TagsReplace {
+			if tag == nil {
+				continue
+			}
+			copied := make(map[string]interface{}, len(tag))
+			for k, v := range tag {
+				copied[k] = v
+			}
+			tags = append(tags, copied)
+		}
+		if len(tags) > 0 {
+			params["tags"] = tags
+		}
+	} else if len(p.TagsToCreate) > 0 {
+		tags := make([]map[string]interface{}, 0, len(p.TagsToCreate))
+		for _, tag := range p.TagsToCreate {
+			if tag == nil {
+				continue
+			}
+			copied := make(map[string]interface{}, len(tag))
+			for k, v := range tag {
+				copied[k] = v
+			}
+			tags = append(tags, copied)
+		}
+		if len(tags) > 0 {
+			params["tags"] = tags
+		}
+	}
+	if len(p.TemplatesReplace) > 0 {
+		templates := make([]map[string]interface{}, 0, len(p.TemplatesReplace))
+		for _, t := range p.TemplatesReplace {
+			if t == nil {
+				continue
+			}
+			copied := make(map[string]interface{})
+			if v, ok := t["templateid"]; ok {
+				copied["templateid"] = v
+			}
+			if len(copied) > 0 {
+				templates = append(templates, copied)
+			}
+		}
+		if len(templates) > 0 {
+			params["templates"] = templates
+		}
+	} else if len(p.TemplatesToLink) > 0 {
+		templates := make([]map[string]interface{}, 0, len(p.TemplatesToLink))
+		for _, t := range p.TemplatesToLink {
+			if t == nil {
+				continue
+			}
+			copied := make(map[string]interface{}, len(t))
+			if v, ok := t["templateid"]; ok {
+				copied["templateid"] = v
+			}
+			if len(copied) > 0 {
+				templates = append(templates, copied)
+			}
+		}
+		if len(templates) > 0 {
+			params["templates"] = templates
+		}
+	}
+	// templates_clear always applied if provided
+	if len(p.TemplatesClear) > 0 {
+		templatesClear := make([]map[string]interface{}, 0, len(p.TemplatesClear))
+		for _, t := range p.TemplatesClear {
+			if t == nil {
+				continue
+			}
+			copied := make(map[string]interface{})
+			if v, ok := t["templateid"]; ok {
+				copied["templateid"] = v
+			}
+			if len(copied) > 0 {
+				templatesClear = append(templatesClear, copied)
+			}
+		}
+		if len(templatesClear) > 0 {
+			params["templates_clear"] = templatesClear
+		}
+	}
+	if len(p.MacrosReplace) > 0 {
+		macros := make([]map[string]interface{}, 0, len(p.MacrosReplace))
+		for _, m := range p.MacrosReplace {
+			if m == nil {
+				continue
+			}
+			copied := make(map[string]interface{}, len(m))
+			for k, v := range m {
+				copied[k] = v
+			}
+			macros = append(macros, copied)
+		}
+		if len(macros) > 0 {
+			params["macros"] = macros
+		}
+	} else if len(p.MacrosToCreate) > 0 {
+		macros := make([]map[string]interface{}, 0, len(p.MacrosToCreate))
+		for _, m := range p.MacrosToCreate {
+			if m == nil {
+				continue
+			}
+			copied := make(map[string]interface{}, len(m))
+			for k, v := range m {
+				copied[k] = v
+			}
+			macros = append(macros, copied)
+		}
+		if len(macros) > 0 {
+			params["macros"] = macros
+		}
+	}
+	if p.Inventory != nil && len(p.Inventory) > 0 {
+		inv := make(map[string]interface{}, len(p.Inventory))
+		for k, v := range p.Inventory {
+			inv[k] = v
+		}
+		params["inventory"] = inv
 	}
 	if p.PreserveKeys {
 		params["preservekeys"] = true

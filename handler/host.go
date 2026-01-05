@@ -166,3 +166,112 @@ func GetHostsHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToo
 
 // 通过主机组查询
 // 通过主机名查询 详细信息 ()
+
+// CreateHostHandler 通过注入的 ClientProvider 调用 host.create 并返回结果
+func CreateHostHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	instanceName := ""
+	host := ""
+	name := ""
+	groups := make([]map[string]interface{}, 0)
+	interfaces := make([]map[string]interface{}, 0)
+	templates := make([]map[string]interface{}, 0)
+	tags := make([]map[string]interface{}, 0)
+	macros := make([]map[string]interface{}, 0)
+	var inventory map[string]interface{}
+
+	if args, ok := req.Params.Arguments.(map[string]interface{}); ok {
+		if v, ok2 := args["instance"].(string); ok2 {
+			instanceName = v
+		}
+		if v, ok2 := args["host"].(string); ok2 {
+			host = v
+		}
+		if v, ok2 := args["name"].(string); ok2 {
+			name = v
+		}
+		// groups can be provided as groupids []string or groups []map
+		if arr, ok2 := args["groupids"].([]interface{}); ok2 {
+			for _, it := range arr {
+				if s, ok3 := it.(string); ok3 && s != "" {
+					groups = append(groups, map[string]interface{}{"groupid": s})
+				}
+			}
+		}
+		if arr, ok2 := args["groups"].([]interface{}); ok2 {
+			for _, it := range arr {
+				if m, ok3 := it.(map[string]interface{}); ok3 {
+					// only keep groupid if present
+					if gid, ok4 := m["groupid"]; ok4 {
+						groups = append(groups, map[string]interface{}{"groupid": gid})
+					}
+				}
+			}
+		}
+		// interfaces array
+		if arr, ok2 := args["interfaces"].([]interface{}); ok2 {
+			for _, it := range arr {
+				if m, ok3 := it.(map[string]interface{}); ok3 {
+					interfaces = append(interfaces, m)
+				}
+			}
+		}
+		// templates can be templateids []string or templates []map
+		if arr, ok2 := args["templateids"].([]interface{}); ok2 {
+			for _, it := range arr {
+				if s, ok3 := it.(string); ok3 && s != "" {
+					templates = append(templates, map[string]interface{}{"templateid": s})
+				}
+			}
+		}
+		if arr, ok2 := args["templates"].([]interface{}); ok2 {
+			for _, it := range arr {
+				if m, ok3 := it.(map[string]interface{}); ok3 {
+					if tid, ok4 := m["templateid"]; ok4 {
+						templates = append(templates, map[string]interface{}{"templateid": tid})
+					}
+				}
+			}
+		}
+		// tags
+		if arr, ok2 := args["tags"].([]interface{}); ok2 {
+			for _, it := range arr {
+				if m, ok3 := it.(map[string]interface{}); ok3 {
+					tags = append(tags, m)
+				}
+			}
+		}
+		// macros
+		if arr, ok2 := args["macros"].([]interface{}); ok2 {
+			for _, it := range arr {
+				if m, ok3 := it.(map[string]interface{}); ok3 {
+					macros = append(macros, m)
+				}
+			}
+		}
+		if inv, ok2 := args["inventory"].(map[string]interface{}); ok2 {
+			inventory = inv
+		}
+	}
+
+	if clientPool == nil {
+		return mcp.NewToolResultStructuredOnly(makeResult([]map[string]interface{}{})), nil
+	}
+
+	spec := models.HostParams{
+		Host:            host,
+		Name:            name,
+		Groups:          groups,
+		Interfaces:      interfaces,
+		TemplatesToLink: templates,
+		TagsToCreate:    tags,
+		MacrosToCreate:  macros,
+		Inventory:       inventory,
+	}
+
+	result, err := server.CreateHost(ctx, clientPool, spec, instanceName)
+	if err != nil {
+		logger.L().Errorf("调用 host.create 失败: %v", err)
+		return nil, fmt.Errorf("调用 host.create 失败: %w", err)
+	}
+	return mcp.NewToolResultStructuredOnly(makeResult(result)), nil
+}

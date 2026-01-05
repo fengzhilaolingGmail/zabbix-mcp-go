@@ -2,7 +2,7 @@
  * @Author: fengzhilaoling fengzhilaoling@gmail.com
  * @Date: 2026-01-02 15:33:32
  * @LastEditors: fengzhilaoling
- * @LastEditTime: 2026-01-02 16:33:48
+ * @LastEditTime: 2026-01-05 17:58:21
  * @FilePath: \zabbix-mcp-go\register\host.go
  * @Description: 文件解释
  * Copyright (c) 2026 by fengzhilaoling@gmail.com, All Rights Reserved.
@@ -51,5 +51,21 @@ func registerHost(s *server.MCPServer) {
 			mcp.WithBoolean("search", mcp.Description("是否启用模糊搜索")),
 		),
 		handler.GetHostsHandler,
+	)
+	s.AddTool(
+		mcp.NewTool("create_host",
+			mcp.WithDescription("在指定实例中创建主机"),
+			mcp.WithString("instance", mcp.Description("Zabbix 实例名称")),
+			mcp.WithString("host", mcp.Required(), mcp.Required(), mcp.Description("主机技术名,host 字段")),
+			mcp.WithString("name", mcp.Required(), mcp.Description("主机可见名称")),
+			mcp.WithArray("groups", mcp.Required(), mcp.Description("主机组对象数组,指定 groupid 字段")),
+			mcp.WithArray("interfaces", mcp.Description("主机接口数组")),
+			mcp.WithArray("templateids", mcp.Description("模板ID数组")),
+			mcp.WithArray("templates", mcp.Description("模板对象数组，包含 templateid 字段")),
+			mcp.WithArray("tags", mcp.Description("主机标签数组")),
+			mcp.WithArray("macros", mcp.Description("用户宏数组")),
+			mcp.WithObject("inventory", mcp.Description("主机清单对象")),
+		),
+		handler.CreateHostHandler,
 	)
 }
