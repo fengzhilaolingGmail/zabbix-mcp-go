@@ -20,4 +20,5 @@ func Registers(s *server.MCPServer) {
 	registerUserGroup(s)
 	registerHost(s)
 	registerItem(s)
+	registerHistory(s)
 }
