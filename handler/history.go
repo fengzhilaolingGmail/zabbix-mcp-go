@@ -13,6 +13,7 @@ package handler
 import (
 	"context"
 	"fmt"
+	"math"
 	"regexp"
 	"strconv"
 	"strings"
@@ -400,4 +401,356 @@ func GetHistoryHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallT
 
 	// 非数值类型直接返回原始 histories
 	return mcp.NewToolResultStructuredOnly(makeResult(histories)), nil
+}
+
+// GetHistoryCompareHandler 实现同比（current vs previous）比较
+// 支持按小时或按天的同比（period: "hour" or "day"，默认 "day"）
+// 计算每个 host+item 的 max/min/avg
+// 请求数据时单次不超过一天（86400s），若范围超过一天则分批次请求并汇总
+func GetHistoryCompareHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	instance := ""
+	var hostIDs []string
+	var itemIDs []string
+	var historyPtr *int
+	period := "day" // hour 或 day
+	timezone := "Asia/Shanghai"
+	var startTimeStr string
+	var stopTimeStr string
+	var timeRangeStr string
+	pctFormat := "number" // "number" (default) or "string" to return percent string like "12.34%"
+
+	if args, ok := req.Params.Arguments.(map[string]interface{}); ok {
+		if v, ok2 := args["instance"].(string); ok2 {
+			instance = v
+		}
+		if arr, ok := args["host_ids"].([]interface{}); ok {
+			for _, e := range arr {
+				if s, ok := e.(string); ok && s != "" {
+					hostIDs = append(hostIDs, s)
+				} else if n, ok := e.(float64); ok {
+					hostIDs = append(hostIDs, strconv.FormatInt(int64(n), 10))
+				}
+			}
+		} else if v, ok := args["host_ids"].(string); ok {
+			if v != "" {
+				hostIDs = append(hostIDs, v)
+			}
+		}
+		if arr, ok := args["item_ids"].([]interface{}); ok {
+			for _, e := range arr {
+				if s, ok := e.(string); ok && s != "" {
+					itemIDs = append(itemIDs, s)
+				} else if n, ok := e.(float64); ok {
+					itemIDs = append(itemIDs, strconv.FormatInt(int64(n), 10))
+				}
+			}
+		} else if v, ok := args["item_ids"].(string); ok {
+			if v != "" {
+				itemIDs = append(itemIDs, v)
+			}
+		}
+		if hv, ok := args["history"]; ok {
+			switch hh := hv.(type) {
+			case float64:
+				hi := int(hh)
+				historyPtr = &hi
+			case int:
+				hi := hh
+				historyPtr = &hi
+			case string:
+				if hh != "" {
+					if n, err := strconv.ParseInt(hh, 10, 64); err == nil {
+						ni := int(n)
+						historyPtr = &ni
+					}
+				}
+			}
+		}
+		if tz, ok := args["timezone"].(string); ok && tz != "" {
+			timezone = tz
+		}
+		if p, ok := args["period"].(string); ok && (p == "hour" || p == "day") {
+			period = p
+		}
+		if tr, ok := args["time_range"].(string); ok && strings.TrimSpace(tr) != "" {
+			timeRangeStr = tr
+		}
+		if pf, ok := args["pct_format"].(string); ok && pf != "" {
+			pf = strings.ToLower(strings.TrimSpace(pf))
+			if pf == "number" || pf == "string" {
+				pctFormat = pf
+			}
+		}
+		if v, ok := args["start_time"]; ok {
+			startTimeStr = fmt.Sprintf("%v", v)
+		} else if v, ok := args["time_from"]; ok {
+			startTimeStr = fmt.Sprintf("%v", v)
+		}
+		if v, ok := args["end_time"]; ok {
+			stopTimeStr = fmt.Sprintf("%v", v)
+		} else if v, ok := args["time_till"]; ok {
+			stopTimeStr = fmt.Sprintf("%v", v)
+		}
+	}
+
+	if len(hostIDs) == 0 && len(itemIDs) == 0 {
+		return nil, fmt.Errorf("hostids or itemids is required")
+	}
+	if historyPtr == nil {
+		def := 0
+		historyPtr = &def
+	}
+	if loc, err := time.LoadLocation(timezone); err != nil {
+		logger.L().Warnf("invalid timezone '%s', fallback to Asia/Shanghai: %v", timezone, err)
+		timezone = "Asia/Shanghai"
+	} else {
+		_ = loc
+	}
+
+	// 解析时间范围
+	loc, _ := time.LoadLocation(timezone)
+	var parsedStart int
+	var parsedStop int
+	if timeRangeStr != "" {
+		seconds, err := parseDurationString(timeRangeStr)
+		if err != nil {
+			return nil, fmt.Errorf("invalid time_range: %w", err)
+		}
+		now := time.Now().In(loc).Unix()
+		parsedStop = int(now)
+		parsedStart = int(now - seconds)
+	} else {
+		if startTimeStr != "" {
+			if t, err := parseTimeParam(startTimeStr, loc); err == nil {
+				parsedStart = t
+			} else {
+				return nil, fmt.Errorf("invalid startTime: %w", err)
+			}
+		}
+		if stopTimeStr != "" {
+			if t, err := parseTimeParam(stopTimeStr, loc); err == nil {
+				parsedStop = t
+			} else {
+				return nil, fmt.Errorf("invalid stopTime: %w", err)
+			}
+		}
+	}
+
+	if clientPool == nil {
+		return mcp.NewToolResultStructuredOnly(makeResult([]map[string]interface{}{})), nil
+	}
+
+	// helper: fetch histories in batches not exceeding one day
+	const maxBatchSeconds = 86400
+	fetchBatched := func(ctx context.Context, baseSpec models.ParamsHistory, start, stop int) ([]map[string]interface{}, error) {
+		var all []map[string]interface{}
+		if stop <= start {
+			return all, nil
+		}
+		cursor := start
+		for cursor < stop {
+			end := cursor + maxBatchSeconds
+			if end > stop {
+				end = stop
+			}
+			spec := baseSpec
+			spec.TimeFrom = cursor
+			spec.TimeTill = end
+			h, err := server.GetHistory(ctx, clientPool, spec, instance)
+			if err != nil {
+				return nil, err
+			}
+			all = append(all, h...)
+			cursor = end
+		}
+		return all, nil
+	}
+
+	// stat struct and aggregation
+	type stat struct {
+		count int
+		sum   float64
+		max   float64
+		min   float64
+	}
+	// (aggregation replaced by per-bucket aggregation below)
+
+	baseSpec := models.ParamsHistory{
+		History: historyPtr,
+		HostIDs: hostIDs,
+		ItemIDs: itemIDs,
+		Output:  "extend",
+	}
+
+	// For time-series per-bucket comparison: build buckets of size bucketSeconds
+	bucketSeconds := 86400
+	if period == "hour" {
+		bucketSeconds = 3600
+	}
+	length := parsedStop - parsedStart
+	if length <= 0 {
+		return nil, fmt.Errorf("invalid time range")
+	}
+	numBuckets := (length + bucketSeconds - 1) / bucketSeconds
+
+	// Instead of fetching all data at once, fetch per-bucket (including previous bucket) and aggregate immediately.
+	statsPerBucket := make(map[int]map[string]*stat)
+	for i := -1; i < numBuckets; i++ {
+		statsPerBucket[i] = make(map[string]*stat)
+		var bstart, bend int
+		if i == -1 {
+			bstart = parsedStart - bucketSeconds
+			if bstart < 0 {
+				bstart = 0
+			}
+			bend = parsedStart
+		} else {
+			bstart = parsedStart + i*bucketSeconds
+			bend = bstart + bucketSeconds
+			if bend > parsedStop {
+				bend = parsedStop
+			}
+		}
+		if bend <= bstart {
+			continue
+		}
+		// fetch this bucket (fetchBatched will respect maxBatchSeconds)
+		hist, err := fetchBatched(ctx, baseSpec, bstart, bend)
+		if err != nil {
+			return nil, err
+		}
+		// aggregate into statsPerBucket[i]
+		for _, h := range hist {
+			valRaw, ok := h["value"]
+			if !ok || valRaw == nil {
+				continue
+			}
+			var fv float64
+			switch v := valRaw.(type) {
+			case float64:
+				fv = v
+			case string:
+				if parsed, err := strconv.ParseFloat(v, 64); err == nil {
+					fv = parsed
+				} else {
+					continue
+				}
+			case int:
+				fv = float64(v)
+			case int64:
+				fv = float64(v)
+			default:
+				continue
+			}
+			itemid := ""
+			if id, ok := h["itemid"]; ok {
+				itemid = fmt.Sprintf("%v", id)
+			}
+			hostid := ""
+			if hid, ok := h["hostid"]; ok {
+				hostid = fmt.Sprintf("%v", hid)
+			}
+			key := itemid
+			if hostid != "" {
+				key = hostid + ":" + itemid
+			}
+			s, ok := statsPerBucket[i][key]
+			if !ok {
+				statsPerBucket[i][key] = &stat{count: 1, sum: fv, max: fv, min: fv}
+			} else {
+				s.count++
+				s.sum += fv
+				if fv > s.max {
+					s.max = fv
+				}
+				if fv < s.min {
+					s.min = fv
+				}
+			}
+		}
+	}
+
+	// build final: map[itemid][hostid] -> []entries per bucket (each with current/previous/delta/pct_change)
+	final := make(map[string]map[string][]map[string]interface{})
+	// collect all keys across buckets
+	allKeys := make(map[string]struct{})
+	for i := -1; i < numBuckets; i++ {
+		for k := range statsPerBucket[i] {
+			allKeys[k] = struct{}{}
+		}
+	}
+
+	for key := range allKeys {
+		hostid := ""
+		itemid := ""
+		if strings.Contains(key, ":") {
+			parts := strings.SplitN(key, ":", 2)
+			hostid = parts[0]
+			itemid = parts[1]
+		} else {
+			itemid = key
+		}
+		if _, ok := final[itemid]; !ok {
+			final[itemid] = make(map[string][]map[string]interface{})
+		}
+		// build entries for each bucket
+		entries := make([]map[string]interface{}, 0, numBuckets)
+		for i := 0; i < numBuckets; i++ {
+			bucketStart := parsedStart + i*bucketSeconds
+			bucketEnd := bucketStart + bucketSeconds
+			if bucketEnd > parsedStop {
+				bucketEnd = parsedStop
+			}
+			curStat := statsPerBucket[i][key]
+			prevStat := statsPerBucket[i-1][key]
+			cur := map[string]interface{}{"count": 0, "avg": 0.0, "max": 0.0, "min": 0.0}
+			prev := map[string]interface{}{"count": 0, "avg": 0.0, "max": 0.0, "min": 0.0}
+			var curAvg, prevAvg float64
+			if curStat != nil && curStat.count > 0 {
+				cur["count"] = curStat.count
+				curAvg = curStat.sum / float64(curStat.count)
+				cur["avg"] = curAvg
+				cur["max"] = curStat.max
+				cur["min"] = curStat.min
+			}
+			if prevStat != nil && prevStat.count > 0 {
+				prev["count"] = prevStat.count
+				prevAvg = prevStat.sum / float64(prevStat.count)
+				prev["avg"] = prevAvg
+				prev["max"] = prevStat.max
+				prev["min"] = prevStat.min
+			}
+			// compute delta and pct_change (pct_change is 0 when previous avg is zero or missing)
+			var delta float64
+			var pctChange interface{}
+			delta = curAvg - prevAvg
+			var pctVal float64
+			if prevStat == nil || prevStat.count == 0 || prevAvg == 0 {
+				pctVal = 0.0
+			} else {
+				pctVal = (delta / prevAvg) * 100.0
+			}
+			// round to 2 decimal places
+			pctVal = math.Round(pctVal*100) / 100
+			if pctFormat == "string" {
+				pctChange = fmt.Sprintf("%.2f%%", pctVal)
+			} else {
+				pctChange = pctVal
+			}
+
+			entry := map[string]interface{}{
+				"time_from":  bucketStart,
+				"time_till":  bucketEnd,
+				"current":    cur,
+				"previous":   prev,
+				"delta":      delta,
+				"pct_change": pctChange,
+			}
+			entries = append(entries, entry)
+		}
+		final[itemid][hostid] = entries
+	}
+
+	wrapper := map[string]interface{}{"period": period, "data": final}
+	return mcp.NewToolResultStructuredOnly(makeResult(wrapper)), nil
 }
