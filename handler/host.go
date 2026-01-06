@@ -2,7 +2,7 @@
  * @Author: fengzhilaoling fengzhilaoling@gmail.com
  * @Date: 2025-12-18 11:20:36
  * @LastEditors: fengzhilaoling
- * @LastEditTime: 2025-12-31 16:44:42
+ * @LastEditTime: 2026-01-06 09:03:08
  * @FilePath: \zabbix-mcp-go\handler\host.go
  * @Description: 主机相关功能
  * @Copyright: Copyright (c) 2025 by fengzhilaoling@gmail.com, All Rights Reserved.
@@ -272,6 +272,184 @@ func CreateHostHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallT
 	if err != nil {
 		logger.L().Errorf("调用 host.create 失败: %v", err)
 		return nil, fmt.Errorf("调用 host.create 失败: %w", err)
+	}
+	return mcp.NewToolResultStructuredOnly(makeResult(result)), nil
+}
+
+// UpdateHostHandler 通过注入的 ClientProvider 调用 host.update 并返回结果
+func UpdateHostHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	instanceName := ""
+	hostids := []string{}
+	host := ""
+	name := ""
+	groupsReplace := make([]map[string]interface{}, 0)
+	interfacesReplace := make([]map[string]interface{}, 0)
+	templatesReplace := make([]map[string]interface{}, 0)
+	templatesClear := make([]map[string]interface{}, 0)
+	tagsReplace := make([]map[string]interface{}, 0)
+	macrosReplace := make([]map[string]interface{}, 0)
+	var inventory map[string]interface{}
+
+	if args, ok := req.Params.Arguments.(map[string]interface{}); ok {
+		if v, ok2 := args["instance"].(string); ok2 {
+			instanceName = v
+		}
+		if arr, ok2 := args["hostids"].([]interface{}); ok2 {
+			for _, it := range arr {
+				if s, ok3 := it.(string); ok3 && s != "" {
+					hostids = append(hostids, s)
+				}
+			}
+		}
+		if v, ok2 := args["hostid"].(string); ok2 && v != "" {
+			hostids = append(hostids, v)
+		}
+		if v, ok2 := args["host"].(string); ok2 {
+			host = v
+		}
+		if v, ok2 := args["name"].(string); ok2 {
+			name = v
+		}
+
+		// groups (用于替换当前主机组)。接受 groups 或 groups_replace 两种形式，优先使用 groups
+		if arr, ok2 := args["groups"].([]interface{}); ok2 {
+			for _, it := range arr {
+				if m, ok3 := it.(map[string]interface{}); ok3 {
+					if gid, ok4 := m["groupid"]; ok4 {
+						groupsReplace = append(groupsReplace, map[string]interface{}{"groupid": gid})
+					}
+				}
+			}
+		}
+		if arr, ok2 := args["groups_replace"].([]interface{}); ok2 {
+			for _, it := range arr {
+				if m, ok3 := it.(map[string]interface{}); ok3 {
+					if gid, ok4 := m["groupid"]; ok4 {
+						groupsReplace = append(groupsReplace, map[string]interface{}{"groupid": gid})
+					}
+				}
+			}
+		}
+
+		// interfaces 用于替换当前主机接口（接受 interfaces 或 interfaces_replace）
+		if arr, ok2 := args["interfaces"].([]interface{}); ok2 {
+			for _, it := range arr {
+				if m, ok3 := it.(map[string]interface{}); ok3 {
+					interfacesReplace = append(interfacesReplace, m)
+				}
+			}
+		}
+		if arr, ok2 := args["interfaces_replace"].([]interface{}); ok2 {
+			for _, it := range arr {
+				if m, ok3 := it.(map[string]interface{}); ok3 {
+					interfacesReplace = append(interfacesReplace, m)
+				}
+			}
+		}
+
+		// templates: 在 update 场景中 templates 用于替换关联模板（templates_clear 用于取消关联并 clear）
+		if arr, ok2 := args["templates"].([]interface{}); ok2 {
+			for _, it := range arr {
+				if m, ok3 := it.(map[string]interface{}); ok3 {
+					if tid, ok4 := m["templateid"]; ok4 {
+						templatesReplace = append(templatesReplace, map[string]interface{}{"templateid": tid})
+					}
+				}
+			}
+		}
+		if arr, ok2 := args["templateids"].([]interface{}); ok2 {
+			for _, it := range arr {
+				if s, ok3 := it.(string); ok3 && s != "" {
+					templatesReplace = append(templatesReplace, map[string]interface{}{"templateid": s})
+				}
+			}
+		}
+		if arr, ok2 := args["templates_replace"].([]interface{}); ok2 {
+			for _, it := range arr {
+				if m, ok3 := it.(map[string]interface{}); ok3 {
+					if tid, ok4 := m["templateid"]; ok4 {
+						templatesReplace = append(templatesReplace, map[string]interface{}{"templateid": tid})
+					}
+				}
+			}
+		}
+		if arr, ok2 := args["templates_clear"].([]interface{}); ok2 {
+			for _, it := range arr {
+				if m, ok3 := it.(map[string]interface{}); ok3 {
+					if tid, ok4 := m["templateid"]; ok4 {
+						templatesClear = append(templatesClear, map[string]interface{}{"templateid": tid})
+					}
+				}
+			}
+		}
+
+		// tags 用于替换当前主机标签（tags 或 tags_replace）
+		if arr, ok2 := args["tags"].([]interface{}); ok2 {
+			for _, it := range arr {
+				if m, ok3 := it.(map[string]interface{}); ok3 {
+					tagsReplace = append(tagsReplace, m)
+				}
+			}
+		}
+		if arr, ok2 := args["tags_replace"].([]interface{}); ok2 {
+			for _, it := range arr {
+				if m, ok3 := it.(map[string]interface{}); ok3 {
+					tagsReplace = append(tagsReplace, m)
+				}
+			}
+		}
+
+		// macros 用于替换当前用户宏（macros 或 macros_replace）
+		if arr, ok2 := args["macros"].([]interface{}); ok2 {
+			for _, it := range arr {
+				if m, ok3 := it.(map[string]interface{}); ok3 {
+					macrosReplace = append(macrosReplace, m)
+				}
+			}
+		}
+		if arr, ok2 := args["macros_replace"].([]interface{}); ok2 {
+			for _, it := range arr {
+				if m, ok3 := it.(map[string]interface{}); ok3 {
+					macrosReplace = append(macrosReplace, m)
+				}
+			}
+		}
+
+		if inv, ok2 := args["inventory"].(map[string]interface{}); ok2 {
+			inventory = inv
+		}
+	}
+
+	if clientPool == nil {
+		return mcp.NewToolResultStructuredOnly(makeResult([]map[string]interface{}{})), nil
+	}
+
+	// Validate hostids: require exactly one hostid for host.update
+	if len(hostids) == 0 {
+		return nil, fmt.Errorf("host.update 需要提供一个 hostid 或 hostids")
+	}
+	if len(hostids) > 1 {
+		return nil, fmt.Errorf("host.update 不支持一次更新多个主机，请对每个主机分别调用 update_host")
+	}
+
+	// Build spec using replace semantics for update
+	spec := models.HostParams{
+		HostID:             hostids[0],
+		Host:               host,
+		Name:               name,
+		GroupsReplace:      groupsReplace,
+		InterfacesReplace:  interfacesReplace,
+		TemplatesReplace:   templatesReplace,
+		TemplatesClear:     templatesClear,
+		TagsReplace:        tagsReplace,
+		MacrosReplace:      macrosReplace,
+		Inventory:          inventory,
+	}
+
+	result, err := server.UpdateHost(ctx, clientPool, spec, instanceName)
+	if err != nil {
+		logger.L().Errorf("调用 host.update 失败: %v", err)
+		return nil, fmt.Errorf("调用 host.update 失败: %w", err)
 	}
 	return mcp.NewToolResultStructuredOnly(makeResult(result)), nil
 }

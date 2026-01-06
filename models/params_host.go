@@ -22,6 +22,7 @@ type HostParams struct {
 	DServiceIDs                   []string                 // dserviceids：仅返回与指定发现服务相关的主机
 	GraphIDs                      []string                 // graphids：仅返回包含指定图形的主机
 	HostIDs                       []string                 // hostids：仅返回具有指定主机 ID 的主机
+	HostID                        string                   // hostid：单个主机 ID，用于 host.update
 	HTTPTestIDs                   []string                 // httptestids：仅返回包含指定 Web 检查的主机
 	InterfaceIDs                  []string                 // interfaceids：仅返回使用指定接口的主机
 	ItemIDs                       []string                 // itemids：仅返回包含指定监控项的主机
@@ -98,6 +99,10 @@ func (p HostParams) BuildParams() map[string]interface{} {
 	}
 	if len(p.HostIDs) > 0 {
 		params["hostids"] = append([]string(nil), p.HostIDs...)
+	}
+	// host.update uses single hostid parameter
+	if p.HostID != "" {
+		params["hostid"] = p.HostID
 	}
 	if len(p.HTTPTestIDs) > 0 {
 		params["httptestids"] = append([]string(nil), p.HTTPTestIDs...)

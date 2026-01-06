@@ -2,7 +2,7 @@
  * @Author: fengzhilaoling fengzhilaoling@gmail.com
  * @Date: 2026-01-02 15:33:32
  * @LastEditors: fengzhilaoling
- * @LastEditTime: 2026-01-05 17:58:21
+ * @LastEditTime: 2026-01-06 09:00:08
  * @FilePath: \zabbix-mcp-go\register\host.go
  * @Description: 文件解释
  * Copyright (c) 2026 by fengzhilaoling@gmail.com, All Rights Reserved.
@@ -55,7 +55,7 @@ func registerHost(s *server.MCPServer) {
 	s.AddTool(
 		mcp.NewTool("create_host",
 			mcp.WithDescription("在指定实例中创建主机"),
-			mcp.WithString("instance", mcp.Description("Zabbix 实例名称")),
+			mcp.WithString("instance", mcp.Required(), mcp.Description("Zabbix 实例名称")),
 			mcp.WithString("host", mcp.Required(), mcp.Required(), mcp.Description("主机技术名,host 字段")),
 			mcp.WithString("name", mcp.Required(), mcp.Description("主机可见名称")),
 			mcp.WithArray("groups", mcp.Required(), mcp.Description("主机组对象数组,指定 groupid 字段")),
@@ -67,5 +67,25 @@ func registerHost(s *server.MCPServer) {
 			mcp.WithObject("inventory", mcp.Description("主机清单对象")),
 		),
 		handler.CreateHostHandler,
+	)
+	// host.update
+	s.AddTool(
+		mcp.NewTool("update_host",
+			mcp.WithDescription("更新主机属性"),
+			mcp.WithString("instance", mcp.Description("Zabbix 实例名称")),
+			mcp.WithString("hostid", mcp.Description("主机ID")),
+			mcp.WithArray("hostids", mcp.Description("主机ID数组")),
+			mcp.WithString("host", mcp.Description("主机技术名")),
+			mcp.WithString("name", mcp.Description("主机可见名")),
+			// 以下字段在 update 场景中表示替换（replace）语义：传入后会替换对应关联，未列出的将被移除
+			mcp.WithArray("groups", mcp.Description("主机组对象数组，仅包含 groupid 字段，用于替换当前主机组")),
+			mcp.WithArray("interfaces", mcp.Description("主机接口对象数组，用于替换当前接口")),
+			mcp.WithArray("templates", mcp.Description("模板对象数组，仅包含 templateid 字段，用于替换当前关联模板")),
+			mcp.WithArray("templates_clear", mcp.Description("模板对象数组，仅包含 templateid 字段，用于解除并清除模板关联")),
+			mcp.WithArray("tags", mcp.Description("主机标签数组，用于替换当前标签")),
+			mcp.WithArray("macros", mcp.Description("用户宏数组，用于替换当前宏")),
+			mcp.WithObject("inventory", mcp.Description("主机资产清单对象，用于替换清单")),
+		),
+		handler.UpdateHostHandler,
 	)
 }

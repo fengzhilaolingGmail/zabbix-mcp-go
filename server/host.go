@@ -80,6 +80,37 @@ func CreateHost(ctx context.Context, provider zabbix.ClientProvider, spec models
 	return hosts, nil
 }
 
+// UpdateHost 调用底层 ClientProvider 执行 host.update，并返回更新结果。
+// instance 为空时使用任意可用客户端，否则强制选择指定实例。
+func UpdateHost(ctx context.Context, provider zabbix.ClientProvider, spec models.ParamSpec, instance string) (map[string]interface{}, error) {
+	if provider == nil {
+		return nil, fmt.Errorf("no zabbix client")
+	}
+	var (
+		lease zabbix.ClientLease
+		err   error
+	)
+	if instance != "" {
+		lease, err = provider.AcquireByInstance(ctx, instance)
+	} else {
+		lease, err = provider.Acquire(ctx)
+	}
+	if err != nil {
+		return nil, err
+	}
+	var callErr error
+	defer func() { lease.Release(callErr) }()
+	client := lease.Client()
+	adapted := client.AdaptAPIParams("host.update", spec)
+	var hosts map[string]interface{}
+	callErr = client.Call(ctx, "host.update", adapted, &hosts)
+	if callErr != nil {
+		logger.L().Error("update host error: %s", callErr.Error())
+		return nil, callErr
+	}
+	return hosts, nil
+}
+
 // TODO 新建 主机 host.delete
 // TODO 删除 主机 host.get
 // TODO 更新 主机 host.update
