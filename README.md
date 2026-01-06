@@ -23,7 +23,7 @@
 | 监控项查询 | `get_items` | 按实例查询监控项，支持按主机 ID/主机名或监控项 key/name 过滤（至少需提供主机或监控项过滤之一） | `instance`（必填）、`host_ids` / `hostname`、`item_key` / `item_name` | `[]map[string]interface{}`，对应 Zabbix `item.get` 的结果 |
 | 历史数据（按时间） | `get_history_by_time` | 按明确开始/结束时间范围获取历史数据，支持是否汇总与历史类型选择 | `instance`（必填）、`host_ids[]`（必填）、`item_ids[]`（必填）、`start_time`（必填）、`end_time`（必填）、`summary`、`history` | 历史数据数组或汇总结果，视 `summary` 与 `history` 而定 |
 | 历史数据（按范围） | `get_history_by_range` | 按相对时间范围（例如 `7d 15h`）获取历史数据，适合快速区间查询 | `instance`（必填）、`host_ids[]`（必填）、`item_ids[]`（必填）、`time_range`（必填）、`summary`、`history` | 历史数据数组或汇总结果 |
-| 历史同比/环比对比 | `get_history_compare` | 获取当前区间与前一周期（previous）对比的数据，支持按日/小时粒度与百分比格式化 | `instance`（必填）、`host_ids[]`（必填）、`item_ids[]`（必填）、`start_time`/`end_time` 或 `time_range`、`period`、`pct_format`、`timezone`、`history` | 返回包含 current 与 previous 两个时间段数据及汇总/同比变化的结构 |
+| 历史同比/环比对比 | `get_history_compare` | 获取当前区间与前一周期（previous）对比的数据，支持按日/小时/分钟粒度与百分比格式化；当使用分钟粒度时（period=`minute`），需通过 `minute_interval` 指定 1/5/15/30 分钟，并且查询范围必须 ≤ 6 小时。 | `instance`（必填）、`host_ids[]`（必填）、`item_ids[]`（必填）、`start_time`/`end_time` 或 `time_range`、`period`（`day`/`hour`/`minute`）、`minute_interval`（仅在 `minute` 时生效，1/5/15/30）、`pct_format`、`timezone`、`history` | 返回包含 current 与 previous 两个时间段数据及汇总/同比变化的结构 |
 
 > ✅ 上述工具均已在 `register/` 下完成注册，可直接通过 MCP Server 暴露给客户端。
 
