@@ -21,4 +21,5 @@ func Registers(s *server.MCPServer) {
 	registerHost(s)
 	registerItem(s)
 	registerHistory(s)
+	registerDashboard(s)
 }
