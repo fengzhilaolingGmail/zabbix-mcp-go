@@ -139,7 +139,7 @@ go test ./...
         用简洁的中文分点说明，关键命令 / 配置需高亮，结果需附带状态验证方法。
 ```
 
-![WeChat Pay](docs/trae.png)
+![trae](docs/trae.jpg)
 
 
 
