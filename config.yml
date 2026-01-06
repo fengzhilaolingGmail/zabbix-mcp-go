@@ -1,0 +1,13 @@
+# Zabbix多实例配置文件
+instances:
+  # 生产环境Zabbix实例
+  - name: "xxx"
+    url: "https://xxxxx/api_jsonrpc.php"
+    auth_type: "token"
+    token: "xxxxx"
+  # 测试环境Zabbix实例
+  - name: "xxxx"
+    url: "http://xxxxx/api_jsonrpc.php"
+    auth_type: "password"
+    username: "xxxxx"
+    password: "xxxxx"

@@ -23,7 +23,7 @@
 | 监控项查询 | `get_items` | 按实例查询监控项，支持按主机 ID/主机名或监控项 key/name 过滤（至少需提供主机或监控项过滤之一） | `instance`（必填）、`host_ids` / `hostname`、`item_key` / `item_name` | `[]map[string]interface{}`，对应 Zabbix `item.get` 的结果 |
 | 历史数据（按时间） | `get_history_by_time` | 按明确开始/结束时间范围获取历史数据，支持是否汇总与历史类型选择 | `instance`（必填）、`host_ids[]`（必填）、`item_ids[]`（必填）、`start_time`（必填）、`end_time`（必填）、`summary`、`history` | 历史数据数组或汇总结果，视 `summary` 与 `history` 而定 |
 | 历史数据（按范围） | `get_history_by_range` | 按相对时间范围（例如 `7d 15h`）获取历史数据，适合快速区间查询 | `instance`（必填）、`host_ids[]`（必填）、`item_ids[]`（必填）、`time_range`（必填）、`summary`、`history` | 历史数据数组或汇总结果 |
-| 历史同比/环比对比 | `get_history_compare` | 获取当前区间与前一周期（previous）对比的数据，支持按日/小时粒度与百分比格式化 | `instance`（必填）、`host_ids[]`（必填）、`item_ids[]`（必填）、`start_time`/`end_time` 或 `time_range`、`period`、`pct_format`、`timezone`、`history` | 返回包含 current 与 previous 两个时间段数据及汇总/同比变化的结构 |
+| 历史同比/环比对比 | `get_history_compare` | 获取当前区间与前一周期（previous）对比的数据，支持按日/小时/分钟粒度与百分比格式化；当使用分钟粒度时（period=`minute`），需通过 `minute_interval` 指定 1/5/15/30 分钟，并且查询范围必须 ≤ 6 小时。 | `instance`（必填）、`host_ids[]`（必填）、`item_ids[]`（必填）、`start_time`/`end_time` 或 `time_range`、`period`（`day`/`hour`/`minute`）、`minute_interval`（仅在 `minute` 时生效，1/5/15/30）、`pct_format`、`timezone`、`history` | 返回包含 current 与 previous 两个时间段数据及汇总/同比变化的结构 |
 
 > ✅ 上述工具均已在 `register/` 下完成注册，可直接通过 MCP Server 暴露给客户端。
 
@@ -99,53 +99,49 @@ go test ./...
 
 #### Cursor（支持 stdio / SSE 双模式）
 
-1. 打开 Cursor → `Settings` → `MCP Servers`，或直接编辑 `C:\Users\<you>\AppData\Roaming\Cursor\User\globalStorage\state.mcp.json`。
-2. 根据需要添加下列配置：
+1. 根据需要添加下列配置sse模式：
 
-| 模式 | 运行命令 | Cursor 配置片段 |
-|------|-----------|------------------|
-| stdio | `D:\go_code\zabbix-mcp-go\zabbixMcp.exe -stdio` | ```json
-{
-  "name": "zabbix-mcp-stdio",
-  "type": "stdio",
-  "command": "D:/go_code/zabbix-mcp-go/zabbixMcp.exe",
-  "args": ["-stdio"],
-  "cwd": "D:/go_code/zabbix-mcp-go"
-}
 ``` |
-| SSE/HTTP | `D:\go_code\zabbix-mcp-go\zabbixMcp.exe -http -port 5443` | ```json
 {
-  "name": "zabbix-mcp-sse",
-  "type": "sse",
-  "url": "http://127.0.0.1:5443/sse",
-  "registrationUrl": "http://127.0.0.1:5443/openapi.json"
-}
-``` |
-
-3. 保存后在 Cursor 的 “Available MCP Servers” 中启用即可；SSE 模式下需保持服务常驻监听。
-
-#### VS Code / GitHub Copilot Chat（Insiders 构建）
-
-1. 确保安装最新版 VS Code + Copilot Chat，并启用实验性的 MCP 支持（`"github.copilot.chat.enableMcp": true`）。
-2. 在 VS Code 用户设置（`settings.json`）中添加：
-
-```json
-"github.copilot.mcpServers": {
-  "zabbix-mcp-stdio": {
-    "type": "stdio",
-    "command": "D:/go_code/zabbix-mcp-go/zabbixMcp.exe",
-    "args": ["-stdio"],
-    "cwd": "D:/go_code/zabbix-mcp-go"
-  },
-  "zabbix-mcp-sse": {
-    "type": "sse",
-    "url": "http://127.0.0.1:5443/sse",
-    "registrationUrl": "http://127.0.0.1:5443/openapi.json"
+  "mcpServers": {
+    "zabbix": {
+      "url": "http://localhost:5443/sse"
+    }
   }
 }
 ```
 
-3. 重启 VS Code 或重新加载窗口后，即可在 Copilot 侧边栏的 MCP 工具列表中看到 `zabbix-mcp-*`，并在对话中通过 `@zabbix-mcp-stdio` 等方式直接调用。
+重启 VS Code 或重新加载窗口后，即可在 Copilot 侧边栏的 MCP 工具列表中看到 `zabbix`，并在对话中通过 `@zabbix` 等方式直接调用。
+
+### trae + 智慧体(测试下来比较好)
+
+```
+# 配置
+{
+  "mcpServers": {
+    "zabbix": {
+      "url": "http://localhost:5443/sse"
+    }
+  }
+}
+
+# 提示词
+你是 “zabbix 服务” 智能体，负责Zabbix 监控系统的全流程管理，需遵循以下规则开展工作：
+    核心角色：
+        作为 Zabbix 专属工具的操作入口，提供部署、配置、运维、故障排查等全场景支持；
+    工作流程：
+        1. 接收用户需求；
+        2. 调用 zabbix 工具执行对应操作（含命令执行、配置修改、数据查询）；
+        3. 输出清晰的操作步骤、结果反馈，必要时提供故障解决方案；
+    工具约束：
+        仅通过已勾选的 “zabbix” 工具完成操作，不调用其他未授权工具；
+    输出规范：
+        用简洁的中文分点说明，关键命令 / 配置需高亮，结果需附带状态验证方法。
+```
+
+![WeChat Pay](docs/trae.png)
+
+
 
 ## 📁 目录概览
 

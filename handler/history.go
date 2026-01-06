@@ -404,7 +404,8 @@ func GetHistoryHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallT
 }
 
 // GetHistoryCompareHandler 实现同比（current vs previous）比较
-// 支持按小时或按天的同比（period: "hour" or "day"，默认 "day"）
+// 支持按天/小时/分钟的同比（period: "day" / "hour" / "minute"，默认 "day"）
+// minute 模式下可通过 minute_interval 参数指定分钟粒度（支持 1,5,15,30）
 // 计算每个 host+item 的 max/min/avg
 // 请求数据时单次不超过一天（86400s），若范围超过一天则分批次请求并汇总
 func GetHistoryCompareHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -412,7 +413,8 @@ func GetHistoryCompareHandler(ctx context.Context, req mcp.CallToolRequest) (*mc
 	var hostIDs []string
 	var itemIDs []string
 	var historyPtr *int
-	period := "day" // hour 或 day
+	period := "day"     // hour 或 day 或 minute
+	minuteInterval := 1 // 支持 1,5,15,30（仅在 period=="minute" 时生效）
 	timezone := "Asia/Shanghai"
 	var startTimeStr string
 	var stopTimeStr string
@@ -469,8 +471,31 @@ func GetHistoryCompareHandler(ctx context.Context, req mcp.CallToolRequest) (*mc
 		if tz, ok := args["timezone"].(string); ok && tz != "" {
 			timezone = tz
 		}
-		if p, ok := args["period"].(string); ok && (p == "hour" || p == "day") {
-			period = p
+		if p, ok := args["period"].(string); ok {
+			p = strings.ToLower(strings.TrimSpace(p))
+			if p == "hour" || p == "day" || p == "minute" {
+				period = p
+			}
+		}
+		// minute_interval: 支持数值 1/5/15/30，或字符串形式
+		if mv, ok := args["minute_interval"]; ok {
+			switch v := mv.(type) {
+			case float64:
+				minuteInterval = int(v)
+			case int:
+				minuteInterval = v
+			case int64:
+				minuteInterval = int(v)
+			case string:
+				if v != "" {
+					if n, err := strconv.ParseInt(strings.TrimSpace(v), 10, 64); err == nil {
+						minuteInterval = int(n)
+					}
+				}
+			}
+			if minuteInterval != 1 && minuteInterval != 5 && minuteInterval != 15 && minuteInterval != 30 {
+				return nil, fmt.Errorf("invalid minute_interval, allowed values: 1,5,15,30")
+			}
 		}
 		if tr, ok := args["time_range"].(string); ok && strings.TrimSpace(tr) != "" {
 			timeRangeStr = tr
@@ -586,10 +611,21 @@ func GetHistoryCompareHandler(ctx context.Context, req mcp.CallToolRequest) (*mc
 	bucketSeconds := 86400
 	if period == "hour" {
 		bucketSeconds = 3600
+	} else if period == "minute" {
+		bucketSeconds = minuteInterval * 60
 	}
 	length := parsedStop - parsedStart
 	if length <= 0 {
 		return nil, fmt.Errorf("invalid time range")
+	}
+	// minute 级别仅允许查询范围在 6 小时（含）以内
+	if period == "minute" {
+		if length > 6*3600 {
+			return nil, fmt.Errorf("minute-level comparison only allowed for ranges <= 6 hours")
+		}
+		if length < bucketSeconds {
+			return nil, fmt.Errorf("time range too short for the configured minute_interval")
+		}
 	}
 	numBuckets := (length + bucketSeconds - 1) / bucketSeconds
 
