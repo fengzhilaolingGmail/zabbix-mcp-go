@@ -360,3 +360,112 @@ func CreateDashboardHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.
 	}
 	return mcp.NewToolResultStructuredOnly(makeResult(result)), nil
 }
+
+// CreateGraphDashboardHandler 使用 hosts 和 graphids 自动创建布局良好的仪表盘
+func CreateGraphDashboardHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	instanceName := ""
+	name := ""
+	hosts := make([]string, 0)
+	graphids := make([]string, 0)
+	rows := 0
+	widgetWidth := 36
+	widgetHeight := 5
+
+	if args, ok := req.Params.Arguments.(map[string]interface{}); ok {
+		if v, ok2 := args["instance"].(string); ok2 {
+			instanceName = v
+		}
+		if v, ok2 := args["name"].(string); ok2 {
+			name = v
+		}
+
+		// 解析 hosts
+		if hostsArr, ok2 := args["hosts"].([]interface{}); ok2 {
+			for _, hostItf := range hostsArr {
+				if hostStr, ok3 := hostItf.(string); ok3 && hostStr != "" {
+					hosts = append(hosts, hostStr)
+				}
+			}
+		}
+
+		// 解析 graphids
+		if graphidsArr, ok2 := args["graphids"].([]interface{}); ok2 {
+			for _, graphidItf := range graphidsArr {
+				if graphidStr, ok3 := graphidItf.(string); ok3 && graphidStr != "" {
+					graphids = append(graphids, graphidStr)
+				}
+			}
+		}
+
+		// 解析可选参数
+		if v, ok2 := args["rows"].(float64); ok2 {
+			rows = int(v)
+		}
+		if v, ok2 := args["widgetWidth"].(float64); ok2 {
+			widgetWidth = int(v)
+		}
+		if v, ok2 := args["widgetHeight"].(float64); ok2 {
+			widgetHeight = int(v)
+		}
+	}
+
+	// 验证必需参数
+	if instanceName == "" {
+		return nil, fmt.Errorf("instance 参数不能为空")
+	}
+	if name == "" {
+		return nil, fmt.Errorf("name 参数不能为空")
+	}
+	if len(hosts) == 0 {
+		return nil, fmt.Errorf("hosts 参数不能为空")
+	}
+	if len(graphids) == 0 {
+		return nil, fmt.Errorf("graphids 参数不能为空")
+	}
+
+	if clientPool == nil {
+		return mcp.NewToolResultStructuredOnly(makeResult([]map[string]interface{}{})), nil
+	}
+
+	// 计算每行的 widget 数量
+	perRow := 2 // 默认每行2个
+	if rows > 0 {
+		totalWidgets := len(hosts) * len(graphids)
+		perRow = (totalWidgets + rows - 1) / rows // 向上取整
+		if perRow < 1 {
+			perRow = 1
+		}
+	}
+
+	// 生成 widgets
+	autoWidgets, err := generateGraphWidgets(hosts, graphids, perRow, widgetWidth, widgetHeight, 0, 0)
+	if err != nil {
+		return nil, fmt.Errorf("生成 widgets 失败: %w", err)
+	}
+
+	// 创建页面
+	pages := []models.DashboardPage{
+		{
+			Name:          "Default Page",
+			DisplayPeriod: 0,
+			Widgets:       autoWidgets,
+		},
+	}
+
+	// 创建仪表盘参数
+	spec := models.DashboardParams{
+		Name:       name,
+		Pages:      pages,
+		Users:      make([]models.DashboardUser, 0),
+		UserGroups: make([]models.DashboardUserGroup, 0),
+	}
+
+	// 调用 server 创建仪表盘
+	result, err := server.CreateDashboard(ctx, clientPool, spec, instanceName)
+	if err != nil {
+		logger.L().Errorf("调用 dashboard.create 失败: %v", err)
+		return nil, fmt.Errorf("创建仪表盘失败: %w", err)
+	}
+
+	return mcp.NewToolResultStructuredOnly(makeResult(result)), nil
+}
