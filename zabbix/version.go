@@ -196,6 +196,18 @@ func (vd *VersionDetector) AdaptAPIParams(method string, spec models.ParamSpec) 
 			delete(adaptedParams, "selectTags")
 			// adaptedParams["output"] = []string{"hostid", "name"}
 		}
+		if version.Major < 6 {
+			// Older Zabbix versions expect different parameter name for requesting host groups
+			// Map both camelCase and snake_case variants to the legacy `selectGroups` key
+			if v, ok := adaptedParams["selectHostGroups"]; ok {
+				adaptedParams["selectGroups"] = v
+				delete(adaptedParams, "selectHostGroups")
+			}
+			if v, ok := adaptedParams["select_host_groups"]; ok {
+				adaptedParams["selectGroups"] = v
+				delete(adaptedParams, "select_host_groups")
+			}
+		}
 	// ========================= User API =========================
 	case "user.get":
 		if version.Major > 5 {

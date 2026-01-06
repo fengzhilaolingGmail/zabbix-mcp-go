@@ -120,7 +120,7 @@ func DisableUser(ctx context.Context, provider zabbix.ClientProvider, userId, in
 	// 查找No access to the frontend 群组id
 	groupSpec := models.UserGroup{
 		Output: "extend",
-		Status: 0,
+		Status: "0",
 		Filter: map[string]interface{}{"name": "No access to the frontend"},
 	}
 	groups, err := GetUserGroups(ctx, provider, groupSpec, instance)
