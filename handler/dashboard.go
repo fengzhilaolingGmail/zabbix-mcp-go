@@ -17,6 +17,7 @@ import (
 	"zabbixMcp/logger"
 	"zabbixMcp/models"
 	"zabbixMcp/server"
+	"zabbixMcp/zabbix"
 
 	"github.com/mark3labs/mcp-go/mcp"
 )
@@ -467,6 +468,47 @@ func CreateGraphDashboardHandler(ctx context.Context, req mcp.CallToolRequest) (
 		pairwise = true
 	}
 
+	// Batch-resolve graph names for nicer widget labels
+	graphIDToName := map[string]string{}
+	if len(graphids) > 0 {
+		if clientPool != nil {
+			var lease zabbix.ClientLease
+			var err error
+			if instanceName != "" {
+				lease, err = clientPool.AcquireByInstance(ctx, instanceName)
+			} else {
+				lease, err = clientPool.Acquire(ctx)
+			}
+			if err == nil && lease != nil {
+				client := lease.Client()
+				specGraph := models.GraphParams{GraphIDs: graphids, Output: []string{"graphid", "name"}}
+				adapted := client.AdaptAPIParams("graph.get", specGraph)
+				var graphList []map[string]interface{}
+				callErr := client.Call(ctx, "graph.get", adapted, &graphList)
+				lease.Release(callErr)
+				if callErr == nil {
+					for _, g := range graphList {
+						gid := ""
+						gname := ""
+						if v, ok := g["graphid"].(string); ok {
+							gid = v
+						}
+						if v, ok := g["name"].(string); ok {
+							gname = v
+						}
+						if gid != "" && gname != "" {
+							graphIDToName[gid] = gname
+						}
+					}
+				} else {
+					logger.L().Warnf("查询 graph 名称失败: %v", callErr)
+				}
+			} else if err != nil {
+				logger.L().Warnf("无法获取 zabbix client 来查询 graph 名称: %v", err)
+			}
+		}
+	}
+
 	// Always attempt to batch-resolve hosts (not only in pairwise mode)
 	hostNameToID := map[string]string{}
 	if len(hosts) > 0 {
@@ -494,9 +536,14 @@ func CreateGraphDashboardHandler(ctx context.Context, req mcp.CallToolRequest) (
 
 	widgets := make([]models.DashboardWidget, 0, len(graphids))
 	for idx, gid := range graphids {
+		// Prefer using graph name when available (fallback to id)
+		nameOrID := gid
+		if n, ok := graphIDToName[gid]; ok && n != "" {
+			nameOrID = n
+		}
 		w := models.DashboardWidget{
 			Type: models.WidgetTypeGraph,
-			Name: fmt.Sprintf("Graph %s", gid),
+			Name: nameOrID,
 		}
 		{
 			ww := widgetWidth
@@ -521,7 +568,7 @@ func CreateGraphDashboardHandler(ctx context.Context, req mcp.CallToolRequest) (
 		}}
 		if pairwise {
 			h := hosts[idx]
-			w.Name = fmt.Sprintf("%s - %s", h, gid)
+			w.Name = fmt.Sprintf("%s - %s", h, nameOrID)
 			if hid, ok := hostNameToID[h]; ok && hid != "" {
 				// hostids: use field type for host (3) and pass array of numeric ids
 				if idNum, err := strconv.Atoi(hid); err == nil {
