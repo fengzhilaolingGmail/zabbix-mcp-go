@@ -2,58 +2,127 @@
  * @Author: fengzhilaoling fengzhilaoling@gmail.com
  * @Date: 2026-01-06 18:50:15
  * @LastEditors: fengzhilaoling
- * @LastEditTime: 2026-01-06 18:50:30
+ * @LastEditTime: 2026-01-07 12:20:00
  * @FilePath: \zabbix-mcp-go\models\params_dashboard.go
- * @Description: 仪表盘参数
- * @Copyright: Copyright (c) 2025 by fengzhilaoling@gmail.com, All Rights Reserved.
+ * @Description: 仪表盘参数（参考 Zabbix 7.4 dashboard object）
+ * Copyright (c) 2025 by fengzhilaoling@gmail.com, All Rights Reserved.
  */
 package models
+
+import "strconv"
 
 // DashboardWidgetField 仪表盘小部件字段
 type DashboardWidgetField struct {
 	Type  int         `json:"type"`  // 小部件字段类型 (0-13)
 	Name  string      `json:"name"`  // 小部件字段名称
-	Value interface{} `json:"value"` // 小部件字段值
+	Value interface{} `json:"value"` // 小部件字段值（mixed）
 }
 
 // DashboardWidget 仪表盘小部件
 type DashboardWidget struct {
-	WidgetID string                 `json:"widgetid,omitempty"`  // 只读 - 小部件ID
-	Type     string                 `json:"type"`                // 必填 - 小部件类型
+	WidgetID string `json:"widgetid,omitempty"` // 只读 - 小部件ID
+	// Type defines widget type. Use WidgetType constants when possible.
+	Type     WidgetType             `json:"type"`                // 必填 - 小部件类型
 	Name     string                 `json:"name,omitempty"`      // 自定义小部件名称
-	X        int                    `json:"x,omitempty"`         // 水平位置 (0-71)
-	Y        int                    `json:"y,omitempty"`         // 垂直位置 (0-63)
-	Width    int                    `json:"width,omitempty"`     // 宽度 (1-72)
-	Height   int                    `json:"height,omitempty"`    // 高度 (1-64)
-	ViewMode int                    `json:"view_mode,omitempty"` // 视图模式 (0-1)
+	X        *int                   `json:"x,omitempty"`         // 水平位置 (0-71)
+	Y        *int                   `json:"y,omitempty"`         // 垂直位置 (0-63)
+	Width    *int                   `json:"width,omitempty"`     // 宽度 (1-72)
+	Height   *int                   `json:"height,omitempty"`    // 高度 (1-64)
+	ViewMode *int                   `json:"view_mode,omitempty"` // 视图模式 (0-1)
 	Fields   []DashboardWidgetField `json:"fields,omitempty"`    // 小部件字段
+}
+
+// WidgetType 仪表盘小部件类型（参考 Zabbix 7.4 文档）
+type WidgetType string
+
+const (
+	WidgetTypeActionLog          WidgetType = "actionlog"
+	WidgetTypeClock              WidgetType = "clock"
+	WidgetTypeDiscovery          WidgetType = "discovery"
+	WidgetTypeFavGraphs          WidgetType = "favgraphs"
+	WidgetTypeFavMaps            WidgetType = "favmaps"
+	WidgetTypeGauge              WidgetType = "gauge"
+	WidgetTypeGeoMap             WidgetType = "geomap"
+	WidgetTypeGraph              WidgetType = "graph"
+	WidgetTypeGraphProto         WidgetType = "graphprototype"
+	WidgetTypeHoneycomb          WidgetType = "honeycomb"
+	WidgetTypeHostAvail          WidgetType = "hostavail"
+	WidgetTypeHostCard           WidgetType = "hostcard"
+	WidgetTypeHostNav            WidgetType = "hostnavigator"
+	WidgetTypeItemCard           WidgetType = "itemcard"
+	WidgetTypeItemHistory        WidgetType = "itemhistory"
+	WidgetTypeItemNav            WidgetType = "itemnavigator"
+	WidgetTypeItemValue          WidgetType = "item" // 监控项
+	WidgetTypeMap                WidgetType = "map"
+	WidgetTypeNavTree            WidgetType = "navtree"
+	WidgetTypePieChart           WidgetType = "piechart"
+	WidgetTypeProblemHosts       WidgetType = "problemhosts"
+	WidgetTypeProblems           WidgetType = "problems"
+	WidgetTypeProblemsBySeverity WidgetType = "problemsbysv"
+	WidgetTypeSLAReport          WidgetType = "slareport"
+	WidgetTypeSVGGraph           WidgetType = "svggraph"
+	WidgetTypeSystemInfo         WidgetType = "systeminfo"
+	WidgetTypeTopHosts           WidgetType = "tophosts"
+	WidgetTypeTopItems           WidgetType = "topitems"
+	WidgetTypeTopTriggers        WidgetType = "toptriggers"
+	WidgetTypeTrigOver           WidgetType = "trigover"
+	WidgetTypeURL                WidgetType = "url"
+	WidgetTypeWeb                WidgetType = "web"
+)
+
+// IsValid 返回 widget type 是否为已知类型
+func (wt WidgetType) IsValid() bool {
+	switch wt {
+	case WidgetTypeActionLog, WidgetTypeClock, WidgetTypeDiscovery, WidgetTypeFavGraphs,
+		WidgetTypeFavMaps, WidgetTypeGauge, WidgetTypeGeoMap, WidgetTypeGraph,
+		WidgetTypeGraphProto, WidgetTypeHoneycomb, WidgetTypeHostAvail, WidgetTypeHostCard,
+		WidgetTypeHostNav, WidgetTypeItemCard, WidgetTypeItemHistory, WidgetTypeItemNav,
+		WidgetTypeItemValue, WidgetTypeMap, WidgetTypeNavTree, WidgetTypePieChart,
+		WidgetTypeProblemHosts, WidgetTypeProblems, WidgetTypeProblemsBySeverity, WidgetTypeSLAReport,
+		WidgetTypeSVGGraph, WidgetTypeSystemInfo, WidgetTypeTopHosts, WidgetTypeTopItems,
+		WidgetTypeTopTriggers, WidgetTypeTrigOver, WidgetTypeURL, WidgetTypeWeb:
+		return true
+	}
+	return false
+}
+
+// isValidWidgetFieldType 检查 Dashboard widget field 的 type 是否在 0-13 范围内
+// IsValidWidgetFieldType checks whether dashboard widget field type is within 0-13
+func IsValidWidgetFieldType(t int) bool {
+	return t >= 0 && t <= 13
 }
 
 // DashboardPage 仪表盘页面
 type DashboardPage struct {
 	DashboardPageID string            `json:"dashboard_pageid,omitempty"` // 只读 - 页面ID
 	Name            string            `json:"name,omitempty"`             // 页面名称
-	DisplayPeriod   int               `json:"display_period,omitempty"`   // 显示周期 (秒)
+	DisplayPeriod   *int              `json:"display_period,omitempty"`   // 显示周期 (秒)
 	Widgets         []DashboardWidget `json:"widgets,omitempty"`          // 小部件数组
 }
 
 // DashboardUser 仪表盘用户共享
 type DashboardUser struct {
 	UserID     string `json:"userid"`     // 用户ID
-	Permission int    `json:"permission"` // 权限级别
+	Permission int    `json:"permission"` // 权限级别 (2 只读, 3 读写)
 }
 
 // DashboardUserGroup 仪表盘用户组共享
 type DashboardUserGroup struct {
 	Usrgrpid   string `json:"usrgrpid"`   // 用户组ID
-	Permission int    `json:"permission"` // 权限级别
+	Permission int    `json:"permission"` // 权限级别 (2 只读, 3 读写)
 }
 
 // DashboardParams 仪表盘参数
 type DashboardParams struct {
 	// 基本字段
 	DashboardID string `json:"dashboardid,omitempty"` // 仪表盘ID (用于更新)
-	Name        string `json:"name"`                  // 仪表盘名称
+	Name        string `json:"name"`                  // 仪表盘名称 (create 必填)
+
+	// 顶层显示/权限相关（指针以便可以显式发送 0 值）
+	UserID        string `json:"userid,omitempty"`         // 仪表板所有者用户ID
+	Private       *int   `json:"private,omitempty"`        // 仪表板共享类型 (0 公共, 1 私有)
+	DisplayPeriod *int   `json:"display_period,omitempty"` // 默认页面显示周期(秒)
+	AutoStart     *int   `json:"auto_start,omitempty"`     // 自动启动幻灯片播放 (0/1)
 
 	// 必填参数
 	Pages      []DashboardPage      `json:"pages"`                // 仪表盘页面数组 (必填)
@@ -91,41 +160,129 @@ func (p DashboardParams) BuildParams() map[string]interface{} {
 		params["name"] = p.Name
 	}
 
+	// 顶层可选字段
+	if p.UserID != "" {
+		params["userid"] = p.UserID
+	}
+	if p.Private != nil {
+		params["private"] = *p.Private
+	}
+	if p.DisplayPeriod != nil {
+		params["display_period"] = *p.DisplayPeriod
+	}
+	if p.AutoStart != nil {
+		params["auto_start"] = *p.AutoStart
+	}
+
 	// 必填参数 - pages
 	if len(p.Pages) > 0 {
 		pages := make([]map[string]interface{}, 0, len(p.Pages))
 		for _, page := range p.Pages {
 			pageMap := map[string]interface{}{
-				"name":           page.Name,
-				"display_period": page.DisplayPeriod,
+				"name": page.Name,
+			}
+
+			if page.DisplayPeriod != nil {
+				pageMap["display_period"] = *page.DisplayPeriod
 			}
 
 			// 处理 widgets
 			if len(page.Widgets) > 0 {
 				widgets := make([]map[string]interface{}, 0, len(page.Widgets))
 				for _, widget := range page.Widgets {
-					widgetMap := map[string]interface{}{
-						"type":      widget.Type,
-						"name":      widget.Name,
-						"x":         widget.X,
-						"y":         widget.Y,
-						"width":     widget.Width,
-						"height":    widget.Height,
-						"view_mode": widget.ViewMode,
+					// skip widgets with unknown/unsupported types
+					if widget.Type == "" || !widget.Type.IsValid() {
+						continue
 					}
 
-					// 处理 fields
+					widgetMap := map[string]interface{}{
+						"type": widget.Type,
+						"name": widget.Name,
+					}
+
+					if widget.X != nil {
+						widgetMap["x"] = *widget.X
+					}
+					if widget.Y != nil {
+						widgetMap["y"] = *widget.Y
+					}
+					if widget.Width != nil {
+						widgetMap["width"] = *widget.Width
+					}
+					if widget.Height != nil {
+						widgetMap["height"] = *widget.Height
+					}
+					if widget.ViewMode != nil {
+						widgetMap["view_mode"] = *widget.ViewMode
+					}
+
+					// 处理 fields -> parameters；过滤无效的 field type
 					if len(widget.Fields) > 0 {
+						// We still produce "fields" array expected by API, normalizing values
 						fields := make([]map[string]interface{}, 0, len(widget.Fields))
 						for _, field := range widget.Fields {
+							// skip invalid field types
+							if !IsValidWidgetFieldType(field.Type) {
+								continue
+							}
+							var normalized interface{}
+							switch field.Name {
+							case "graphid":
+								switch v := field.Value.(type) {
+								case string:
+									if n, err := strconv.Atoi(v); err == nil {
+										normalized = n
+									} else {
+										normalized = v
+									}
+								case float64:
+									normalized = int(v)
+								default:
+									normalized = v
+								}
+							case "hostids":
+								switch v := field.Value.(type) {
+								case string:
+									if n, err := strconv.Atoi(v); err == nil {
+										normalized = []int{n}
+									} else {
+										normalized = []string{v}
+									}
+								case float64:
+									normalized = []int{int(v)}
+								case []interface{}:
+									arr := make([]interface{}, 0, len(v))
+									for _, it := range v {
+										switch itv := it.(type) {
+										case string:
+											if n, err := strconv.Atoi(itv); err == nil {
+												arr = append(arr, n)
+											} else {
+												arr = append(arr, itv)
+											}
+										case float64:
+											arr = append(arr, int(itv))
+										default:
+											arr = append(arr, itv)
+										}
+									}
+									normalized = arr
+								default:
+									normalized = field.Value
+								}
+							default:
+								normalized = field.Value
+							}
 							fieldMap := map[string]interface{}{
 								"type":  field.Type,
 								"name":  field.Name,
-								"value": field.Value,
+								"value": normalized,
 							}
 							fields = append(fields, fieldMap)
 						}
-						widgetMap["fields"] = fields
+						if len(fields) > 0 {
+							widgetMap["fields"] = fields
+						}
 					}
 
 					widgets = append(widgets, widgetMap)

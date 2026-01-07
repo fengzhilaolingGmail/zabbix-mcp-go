@@ -2,7 +2,7 @@
  * @Author: fengzhilaoling fengzhilaoling@gmail.com
  * @Date: 2026-01-06 19:05:52
  * @LastEditors: fengzhilaoling
- * @LastEditTime: 2026-01-06 20:55:33
+ * @LastEditTime: 2026-01-07 12:05:30
  * @FilePath: \zabbix-mcp-go\register\dashboard.go
  * @Description: 仪表盘注册
  * @Copyright: Copyright (c) 2025 by fengzhilaoling@gmail.com, All Rights Reserved.
@@ -23,6 +23,10 @@ func registerDashboard(s *server.MCPServer) {
 			mcp.WithString("instance", mcp.Required(), mcp.Description("Zabbix 实例名称")),
 			mcp.WithString("name", mcp.Required(), mcp.Description("仪表盘名称")),
 			mcp.WithArray("pages", mcp.Description("仪表盘页面数组，包含 widgets 配置。示例: [{\"name\":\"Default Page\",\"display_period\":0,\"widgets\":[{\"type\":\"graph\",\"height\":10,\"width\":36,\"x\":0,\"y\":0,\"fields\":[{\"name\":\"graphid\",\"value\":5658}]}] } ]")),
+			mcp.WithString("userid", mcp.Description("仪表板所有者用户ID (可选)")),
+			mcp.WithNumber("private", mcp.Description("仪表盘共享类型 (0 公共, 1 私有， 可选)")),
+			mcp.WithNumber("display_period", mcp.Description("默认页面显示周期（秒，可选）")),
+			mcp.WithNumber("auto_start", mcp.Description("是否自动启动幻灯片播放 (0/1 可选)")),
 			mcp.WithArray("users", mcp.Description("仪表盘用户共享数组，包含 userid 和 permission")),
 			mcp.WithArray("userGroups", mcp.Description("仪表盘用户组共享数组，包含 usrgrpid 和 permission")),
 		),
@@ -36,7 +40,7 @@ func registerDashboard(s *server.MCPServer) {
 			mcp.WithString("name", mcp.Required(), mcp.Description("仪表盘名称")),
 			mcp.WithArray("hosts", mcp.Required(), mcp.Description("主机列表（字符串）")),
 			mcp.WithArray("graphids", mcp.Required(), mcp.Description("图形ID列表（数值或字符串）")),
-			mcp.WithNumber("rows", mcp.Description("期望的行数（可选），将据此计算每行 widget 个数")),
+			mcp.WithNumber("cols", mcp.Description("每行 widget 个数（可选，默认2）")),
 			mcp.WithNumber("widgetWidth", mcp.Description("每个 widget 的宽度（可选，默认36）")),
 			mcp.WithNumber("widgetHeight", mcp.Description("每个 widget 的高度（可选，默认5）")),
 		),
