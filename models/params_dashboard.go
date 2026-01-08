@@ -62,6 +62,7 @@ const (
 	WidgetTypeSLAReport          WidgetType = "slareport"
 	WidgetTypeSVGGraph           WidgetType = "svggraph"
 	WidgetTypeSystemInfo         WidgetType = "systeminfo"
+	WidgetTypeText               WidgetType = "text" // 文本
 	WidgetTypeTopHosts           WidgetType = "tophosts"
 	WidgetTypeTopItems           WidgetType = "topitems"
 	WidgetTypeTopTriggers        WidgetType = "toptriggers"
@@ -79,7 +80,7 @@ func (wt WidgetType) IsValid() bool {
 		WidgetTypeHostNav, WidgetTypeItemCard, WidgetTypeItemHistory, WidgetTypeItemNav,
 		WidgetTypeItemValue, WidgetTypeMap, WidgetTypeNavTree, WidgetTypePieChart,
 		WidgetTypeProblemHosts, WidgetTypeProblems, WidgetTypeProblemsBySeverity, WidgetTypeSLAReport,
-		WidgetTypeSVGGraph, WidgetTypeSystemInfo, WidgetTypeTopHosts, WidgetTypeTopItems,
+		WidgetTypeSVGGraph, WidgetTypeSystemInfo, WidgetTypeText, WidgetTypeTopHosts, WidgetTypeTopItems,
 		WidgetTypeTopTriggers, WidgetTypeTrigOver, WidgetTypeURL, WidgetTypeWeb:
 		return true
 	}

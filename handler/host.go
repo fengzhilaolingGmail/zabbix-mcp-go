@@ -2,7 +2,7 @@
  * @Author: fengzhilaoling fengzhilaoling@gmail.com
  * @Date: 2025-12-18 11:20:36
  * @LastEditors: fengzhilaoling
- * @LastEditTime: 2026-01-06 09:03:08
+ * @LastEditTime: 2026-01-08 13:59:51
  * @FilePath: \zabbix-mcp-go\handler\host.go
  * @Description: 主机相关功能
  * @Copyright: Copyright (c) 2025 by fengzhilaoling@gmail.com, All Rights Reserved.
@@ -434,16 +434,16 @@ func UpdateHostHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallT
 
 	// Build spec using replace semantics for update
 	spec := models.HostParams{
-		HostID:             hostids[0],
-		Host:               host,
-		Name:               name,
-		GroupsReplace:      groupsReplace,
-		InterfacesReplace:  interfacesReplace,
-		TemplatesReplace:   templatesReplace,
-		TemplatesClear:     templatesClear,
-		TagsReplace:        tagsReplace,
-		MacrosReplace:      macrosReplace,
-		Inventory:          inventory,
+		HostID:            hostids[0],
+		Host:              host,
+		Name:              name,
+		GroupsReplace:     groupsReplace,
+		InterfacesReplace: interfacesReplace,
+		TemplatesReplace:  templatesReplace,
+		TemplatesClear:    templatesClear,
+		TagsReplace:       tagsReplace,
+		MacrosReplace:     macrosReplace,
+		Inventory:         inventory,
 	}
 
 	result, err := server.UpdateHost(ctx, clientPool, spec, instanceName)
@@ -452,4 +452,50 @@ func UpdateHostHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallT
 		return nil, fmt.Errorf("调用 host.update 失败: %w", err)
 	}
 	return mcp.NewToolResultStructuredOnly(makeResult(result)), nil
+}
+
+func GetHostsRefineHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	instance := ""
+	hostids := []string{}
+	style := ""
+	is_detailed := false
+	if args, ok := req.Params.Arguments.(map[string]interface{}); ok {
+		if v, ok2 := args["instance"].(string); ok2 {
+			instance = v
+		}
+		if arr, ok := args["hostids"].([]interface{}); ok {
+			for _, v := range arr {
+				if s, ok := v.(string); ok && s != "" {
+					hostids = append(hostids, s)
+				}
+			}
+		}
+		if v, ok := args["style"].(string); ok {
+			style = v
+		}
+		if v, ok := args["is_detailed"].(bool); ok {
+			is_detailed = v
+		}
+	}
+	if clientPool == nil {
+		return mcp.NewToolResultStructuredOnly(makeResult([]map[string]interface{}{})), nil
+	}
+	spec := models.HostParams{Output: "extend", SelectInterfaces: "extend"}
+	spec.HostIDs = hostids
+	switch style {
+	case "graphs":
+		if is_detailed {
+			spec.SelectGraphs = "extend"
+		} else {
+			spec.SelectGraphs = []string{"graphid", "name"}
+		}
+
+	default:
+		return nil, fmt.Errorf("不支持的 style: %s", style)
+	}
+	hosts, err := server.GetHosts(ctx, clientPool, spec, instance)
+	if err != nil {
+		return nil, fmt.Errorf("调用 host.get 失败: %w", err)
+	}
+	return mcp.NewToolResultStructuredOnly(makeResult(hosts)), nil
 }

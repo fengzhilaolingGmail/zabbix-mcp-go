@@ -2,7 +2,7 @@
  * @Author: fengzhilaoling fengzhilaoling@gmail.com
  * @Date: 2026-01-06 18:59:21
  * @LastEditors: fengzhilaoling
- * @LastEditTime: 2026-01-07 12:02:46
+ * @LastEditTime: 2026-01-08 15:25:15
  * @FilePath: \zabbix-mcp-go\handler\dashboard.go
  * @Description: 仪表盘相关功能
  * @Copyright: Copyright (c) 2025 by fengzhilaoling@gmail.com, All Rights Reserved.
@@ -389,18 +389,15 @@ func CreateDashboardHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.
 	return mcp.NewToolResultStructuredOnly(makeResult(dashboard)), nil
 }
 
-// CreateGraphDashboardHandler 使用 hosts + graphids 自动创建布局良好的仪表盘
+// CreateGraphDashboardHandler 自动创建图形仪表盘，支持两种模式
 func CreateGraphDashboardHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	instanceName := ""
 	name := ""
+	mode := 0
 	hosts := []string{}
-	graphidsRaw := []interface{}{}
-	cols := 2
-	widgetWidth := 36
-	widgetHeight := 5
-	var private *int
-	var displayPeriod *int
-	var autoStart *int
+	graphNames := []string{}
+	maxCols := 0
+	maxRows := 10
 
 	if args, ok := req.Params.Arguments.(map[string]interface{}); ok {
 		if v, ok2 := args["instance"].(string); ok2 {
@@ -409,6 +406,9 @@ func CreateGraphDashboardHandler(ctx context.Context, req mcp.CallToolRequest) (
 		if v, ok2 := args["name"].(string); ok2 {
 			name = v
 		}
+		if v, ok2 := args["mode"].(float64); ok2 {
+			mode = int(v)
+		}
 		if arr, ok2 := args["hosts"].([]interface{}); ok2 {
 			for _, h := range arr {
 				if s, ok3 := h.(string); ok3 && s != "" {
@@ -416,29 +416,18 @@ func CreateGraphDashboardHandler(ctx context.Context, req mcp.CallToolRequest) (
 				}
 			}
 		}
-		if arr, ok2 := args["graphids"].([]interface{}); ok2 {
-			graphidsRaw = arr
+		if arr, ok2 := args["graph_names"].([]interface{}); ok2 {
+			for _, g := range arr {
+				if s, ok3 := g.(string); ok3 && s != "" {
+					graphNames = append(graphNames, s)
+				}
+			}
 		}
-		if v, ok2 := args["cols"].(float64); ok2 && int(v) > 0 {
-			cols = int(v)
+		if v, ok2 := args["max_cols"].(float64); ok2 && int(v) > 0 {
+			maxCols = int(v)
 		}
-		if v, ok2 := args["widgetWidth"].(float64); ok2 && int(v) > 0 {
-			widgetWidth = int(v)
-		}
-		if v, ok2 := args["widgetHeight"].(float64); ok2 && int(v) > 0 {
-			widgetHeight = int(v)
-		}
-		if v, ok2 := args["private"].(float64); ok2 {
-			n := int(v)
-			private = &n
-		}
-		if v, ok2 := args["display_period"].(float64); ok2 {
-			n := int(v)
-			displayPeriod = &n
-		}
-		if v, ok2 := args["auto_start"].(float64); ok2 {
-			n := int(v)
-			autoStart = &n
+		if v, ok2 := args["max_rows"].(float64); ok2 && int(v) > 0 {
+			maxRows = int(v)
 		}
 	}
 
@@ -446,167 +435,47 @@ func CreateGraphDashboardHandler(ctx context.Context, req mcp.CallToolRequest) (
 		return mcp.NewToolResultStructuredOnly(makeResult(map[string]interface{}{})), nil
 	}
 
-	// Prepare graph id list as strings (models will normalize)
-	graphids := make([]string, 0, len(graphidsRaw))
-	for _, g := range graphidsRaw {
-		switch v := g.(type) {
-		case string:
-			if v != "" {
-				graphids = append(graphids, v)
-			}
-		case float64:
-			graphids = append(graphids, strconv.Itoa(int(v)))
-		case int:
-			graphids = append(graphids, strconv.Itoa(v))
-		default:
-			graphids = append(graphids, fmt.Sprintf("%v", v))
-		}
-	}
-
-	pairwise := false
-	if len(hosts) > 0 && len(hosts) == len(graphids) {
-		pairwise = true
-	}
-
-	// Batch-resolve graph names for nicer widget labels
-	graphIDToName := map[string]string{}
-	if len(graphids) > 0 {
-		if clientPool != nil {
-			var lease zabbix.ClientLease
-			var err error
-			if instanceName != "" {
-				lease, err = clientPool.AcquireByInstance(ctx, instanceName)
-			} else {
-				lease, err = clientPool.Acquire(ctx)
-			}
-			if err == nil && lease != nil {
-				client := lease.Client()
-				specGraph := models.GraphParams{GraphIDs: graphids, Output: []string{"graphid", "name"}}
-				adapted := client.AdaptAPIParams("graph.get", specGraph)
-				var graphList []map[string]interface{}
-				callErr := client.Call(ctx, "graph.get", adapted, &graphList)
-				lease.Release(callErr)
-				if callErr == nil {
-					for _, g := range graphList {
-						gid := ""
-						gname := ""
-						if v, ok := g["graphid"].(string); ok {
-							gid = v
-						}
-						if v, ok := g["name"].(string); ok {
-							gname = v
-						}
-						if gid != "" && gname != "" {
-							graphIDToName[gid] = gname
-						}
-					}
-				} else {
-					logger.L().Warnf("查询 graph 名称失败: %v", callErr)
-				}
-			} else if err != nil {
-				logger.L().Warnf("无法获取 zabbix client 来查询 graph 名称: %v", err)
-			}
-		}
-	}
-
-	// Always attempt to batch-resolve hosts (not only in pairwise mode)
+	// 查询主机ID映射
 	hostNameToID := map[string]string{}
 	if len(hosts) > 0 {
 		specHosts := models.HostParams{Output: []string{"hostid", "host"}}
-		specHosts.Filter = map[string]interface{}{"host": hosts}
+		specHosts.Filter = map[string]interface{}{
+			"host":   hosts,
+			"status": "0", // 只查询主机，排除模板（模板 status = 3）
+		}
 		hostList, err := server.GetHosts(ctx, clientPool, specHosts, instanceName)
 		if err == nil {
 			for _, h := range hostList {
-				hn := ""
-				hid := ""
-				if v, ok := h["host"].(string); ok {
-					hn = v
-				}
-				if v, ok := h["hostid"].(string); ok {
-					hid = v
-				}
-				if hn != "" && hid != "" {
-					hostNameToID[hn] = hid
+				if hn, ok := h["host"].(string); ok {
+					if hid, ok := h["hostid"].(string); ok {
+						hostNameToID[hn] = hid
+					}
 				}
 			}
-		} else {
-			logger.L().Warnf("查询主机 hostid 失败，将不注入 hostids：%v", err)
 		}
 	}
 
-	widgets := make([]models.DashboardWidget, 0, len(graphids))
-	for idx, gid := range graphids {
-		// Prefer using graph name when available (fallback to id)
-		nameOrID := gid
-		if n, ok := graphIDToName[gid]; ok && n != "" {
-			nameOrID = n
-		}
-		w := models.DashboardWidget{
-			Type: models.WidgetTypeGraph,
-			Name: nameOrID,
-		}
-		{
-			ww := widgetWidth
-			hh := widgetHeight
-			w.Width = &ww
-			w.Height = &hh
-		}
-		xv := (idx % cols) * widgetWidth
-		yv := (idx / cols) * widgetHeight
-		w.X = &xv
-		w.Y = &yv
+	var widgets []models.DashboardWidget
 
-		var graphVal interface{} = gid
-		if n, err := strconv.Atoi(gid); err == nil {
-			graphVal = n
-		}
-		// graphid: use field type for graph (6) per Zabbix dashboard widget fields
-		fields := []models.DashboardWidgetField{{
-			Type:  6,
-			Name:  "graphid",
-			Value: graphVal,
-		}}
-		if pairwise {
-			h := hosts[idx]
-			w.Name = fmt.Sprintf("%s - %s", h, nameOrID)
-			if hid, ok := hostNameToID[h]; ok && hid != "" {
-				// hostids: use field type for host (3) and pass array of numeric ids
-				if idNum, err := strconv.Atoi(hid); err == nil {
-					// Zabbix expects a single numeric host id value for this field (not an array)
-					fields = append(fields, models.DashboardWidgetField{Type: 3, Name: "hostids", Value: idNum})
-				} else {
-					logger.L().Warnf("主机 id %s 不是数字，跳过注入 hostids", hid)
-				}
-			} else {
-				logger.L().Warnf("未解析到主机 %s 的 hostid，跳过注入 hostids", h)
-			}
-		}
-		w.Fields = fields
-		widgets = append(widgets, w)
+	switch mode {
+	case 1:
+		// 模式1：聚合模式 - 多台主机相同图形名称
+		widgets = buildAggregateModeWidgets(hosts, hostNameToID, graphNames, instanceName, ctx, maxCols, maxRows)
+	case 2:
+		// 模式2：分列模式 - 每台主机不同图形
+		widgets = buildSeparateModeWidgets(hosts, hostNameToID, graphNames, instanceName, ctx, maxCols, maxRows)
+	default:
+		return nil, fmt.Errorf("无效的模式: %d，请使用 1 (聚合模式) 或 2 (分列模式)", mode)
 	}
 
-	dp := 0
-	if displayPeriod != nil {
-		dp = *displayPeriod
-	}
 	page := models.DashboardPage{
-		Name:          "Default Page",
-		DisplayPeriod: &dp,
-		Widgets:       widgets,
+		Name:    "Default Page",
+		Widgets: widgets,
 	}
 
 	spec := models.DashboardParams{
 		Name:  name,
 		Pages: []models.DashboardPage{page},
-	}
-	if private != nil {
-		spec.Private = private
-	}
-	if displayPeriod != nil {
-		spec.DisplayPeriod = displayPeriod
-	}
-	if autoStart != nil {
-		spec.AutoStart = autoStart
 	}
 
 	dashboard, err := server.CreateDashboard(ctx, clientPool, spec, instanceName)
@@ -615,4 +484,429 @@ func CreateGraphDashboardHandler(ctx context.Context, req mcp.CallToolRequest) (
 		return nil, fmt.Errorf("调用 dashboard.create 失败: %w", err)
 	}
 	return mcp.NewToolResultStructuredOnly(makeResult(dashboard)), nil
+}
+
+// buildAggregateModeWidgets 构建聚合模式的 widgets
+func buildAggregateModeWidgets(hosts []string, hostNameToID map[string]string, graphNames []string, instanceName string, ctx context.Context, maxCols, maxRows int) []models.DashboardWidget {
+	widgets := make([]models.DashboardWidget, 0)
+
+	if len(hosts) == 0 || len(graphNames) == 0 {
+		return widgets
+	}
+
+	// 默认列数为2
+	if maxCols <= 0 {
+		maxCols = 2
+	}
+
+	// 检查是否超限
+	if maxCols > 72 {
+		maxCols = 72
+	}
+	if maxRows > 64 {
+		maxRows = 64
+	}
+
+	// 自动计算 widget 尺寸
+	widgetWidth := 72 / maxCols
+	if widgetWidth < 1 {
+		widgetWidth = 1
+	}
+	widgetHeight := 64 / maxRows
+	if widgetHeight < 1 {
+		widgetHeight = 1
+	}
+
+	// 一次性查询所有主机和所有图形的映射关系
+	hostGraphMap := make(map[string]map[string]string) // host -> graphName -> graphid
+
+	// 收集所有需要查询的主机ID
+	hostIDs := make([]string, 0, len(hosts))
+	for _, host := range hosts {
+		if hidStr, ok := hostNameToID[host]; ok {
+			hostIDs = append(hostIDs, hidStr)
+			hostGraphMap[host] = make(map[string]string)
+		}
+	}
+
+	if len(hostIDs) > 0 && len(graphNames) > 0 {
+		// 使用 host.get 批量查询所有主机及其图形信息
+		// 通过 selectGraphs 参数一次性获取主机的图形列表
+		// 注意：需要排除模板（template），只查询真实主机（status = 0）
+		specHosts := models.HostParams{
+			Output: []string{"hostid", "host"},
+			Filter: map[string]interface{}{
+				"hostid": hostIDs,
+				"status": "0", // 只查询主机，排除模板（模板 status = 3）
+			},
+			SelectGraphs: []string{"graphid", "name"}, // 获取图形信息
+		}
+
+		var lease zabbix.ClientLease
+		var err error
+		if instanceName != "" {
+			lease, err = clientPool.AcquireByInstance(ctx, instanceName)
+		} else {
+			lease, err = clientPool.Acquire(ctx)
+		}
+		if err == nil && lease != nil {
+			client := lease.Client()
+			adapted := client.AdaptAPIParams("host.get", specHosts)
+			var hostList []map[string]interface{}
+			callErr := client.Call(ctx, "host.get", adapted, &hostList)
+			lease.Release(callErr)
+
+			if callErr == nil {
+				logger.L().Infof("批量查询到 %d 个主机及其图形信息", len(hostList))
+				// 构建映射关系
+				for _, host := range hostList {
+					hostname, _ := host["host"].(string)
+
+					// 获取该主机的图形列表
+					if graphs, ok := host["graphs"].([]interface{}); ok && len(graphs) > 0 {
+						for _, g := range graphs {
+							if graphMap, ok := g.(map[string]interface{}); ok {
+								graphid, _ := graphMap["graphid"].(string)
+								graphName, _ := graphMap["name"].(string)
+
+								// 检查图形名称是否在请求的列表中
+								for _, requestedName := range graphNames {
+									if graphName == requestedName {
+										hostGraphMap[hostname][graphName] = graphid
+										logger.L().Debugf("映射: %s -> %s -> %s", hostname, graphName, graphid)
+										break
+									}
+								}
+							}
+						}
+					}
+				}
+			} else {
+				logger.L().Warnf("批量查询主机及图形失败: %v", callErr)
+			}
+		}
+	}
+
+	idx := 0
+	for _, graphName := range graphNames {
+		for _, host := range hosts {
+			if hidStr, ok := hostNameToID[host]; ok {
+				// 将 hostid 转换为数字
+				hidNum, err := strconv.Atoi(hidStr)
+				if err != nil {
+					logger.L().Warnf("主机 %s 的 hostid %s 不是有效数字，跳过", host, hidStr)
+					continue
+				}
+
+				// 从映射中获取图形ID
+				graphid := ""
+				if hostMap, ok := hostGraphMap[host]; ok {
+					graphid = hostMap[graphName]
+				}
+
+				var widgetType models.WidgetType
+				var fields []models.DashboardWidgetField
+
+				if graphid != "" {
+					// 图形存在，创建 graph widget
+					widgetType = models.WidgetTypeGraph
+					fields = []models.DashboardWidgetField{
+						{Type: 6, Name: "graphid", Value: graphid},
+						{Type: 3, Name: "hostids", Value: hidNum},
+					}
+				} else {
+					// 图形不存在，创建 text widget 作为占位符
+					widgetType = models.WidgetTypeText
+					textContent := fmt.Sprintf("图形不存在: %s\n主机: %s", graphName, host)
+					fields = []models.DashboardWidgetField{
+						{Type: 0, Name: "text_size", Value: 12},     // text_size 字段类型为 0（整数）
+						{Type: 1, Name: "text", Value: textContent}, // text 字段类型为 1（字符串）
+					}
+					logger.L().Debugf("主机 %s 的图形 %s 不存在，创建文本占位组件", host, graphName)
+				}
+
+				x := (idx % maxCols) * widgetWidth
+				y := (idx / maxCols) * widgetHeight
+
+				w := models.DashboardWidget{
+					Type: widgetType,
+					Name: fmt.Sprintf("%s - %s", host, graphName),
+					X:    &x,
+					Y:    &y,
+				}
+				w.Width = &widgetWidth
+				w.Height = &widgetHeight
+				w.Fields = fields
+				widgets = append(widgets, w)
+				idx++
+			}
+		}
+	}
+	return widgets
+}
+
+// buildSeparateModeWidgets 构建分列模式的 widgets
+// 模式2：每台主机一列，每列包含该主机的多个图形（垂直排列）
+func buildSeparateModeWidgets(hosts []string, hostNameToID map[string]string, graphNames []string, instanceName string, ctx context.Context, maxCols, maxRows int) []models.DashboardWidget {
+	widgets := make([]models.DashboardWidget, 0)
+
+	if len(hosts) == 0 {
+		return widgets
+	}
+
+	// 默认列数为主机数量
+	if maxCols <= 0 {
+		maxCols = len(hosts)
+	}
+
+	// 检查是否超限
+	if maxCols > 72 {
+		return widgets // 主机数量超限，返回空
+	}
+	if maxRows > 64 {
+		maxRows = 64
+	}
+
+	// 自动计算 widget 尺寸
+	widgetWidth := 72 / maxCols
+	if widgetWidth < 1 {
+		widgetWidth = 1
+	}
+	widgetHeight := 64 / maxRows
+	if widgetHeight < 1 {
+		widgetHeight = 1
+	}
+
+	// 一次性查询所有主机和所有图形的映射关系
+	hostGraphMap := make(map[string]map[string]string) // host -> graphName -> graphid
+
+	// 收集所有需要查询的主机ID
+	hostIDs := make([]string, 0, len(hosts))
+	hostIDToName := make(map[string]string) // hostid -> hostname
+
+	for _, host := range hosts {
+		if hidStr, ok := hostNameToID[host]; ok {
+			hostIDs = append(hostIDs, hidStr)
+			hostIDToName[hidStr] = host
+			hostGraphMap[host] = make(map[string]string)
+		}
+	}
+
+	if len(hostIDs) > 0 && len(graphNames) > 0 {
+		// 使用 host.get 批量查询所有主机及其图形信息
+		// 通过 selectGraphs 参数一次性获取主机的图形列表
+		// 注意：需要排除模板（template），只查询真实主机（status = 0）
+		specHosts := models.HostParams{
+			Output: []string{"hostid", "host"},
+			Filter: map[string]interface{}{
+				"hostid": hostIDs,
+				"status": "0", // 只查询主机，排除模板（模板 status = 3）
+			},
+			SelectGraphs: []string{"graphid", "name"}, // 获取图形信息
+		}
+
+		var lease zabbix.ClientLease
+		var err error
+		if instanceName != "" {
+			lease, err = clientPool.AcquireByInstance(ctx, instanceName)
+		} else {
+			lease, err = clientPool.Acquire(ctx)
+		}
+		if err == nil && lease != nil {
+			client := lease.Client()
+			adapted := client.AdaptAPIParams("host.get", specHosts)
+			var hostList []map[string]interface{}
+			callErr := client.Call(ctx, "host.get", adapted, &hostList)
+			lease.Release(callErr)
+
+			if callErr == nil {
+				logger.L().Infof("批量查询到 %d 个主机及其图形信息", len(hostList))
+				// 构建映射关系
+				for _, host := range hostList {
+					hostname, _ := host["host"].(string)
+
+					// 获取该主机的图形列表
+					if graphs, ok := host["graphs"].([]interface{}); ok && len(graphs) > 0 {
+						for _, g := range graphs {
+							if graphMap, ok := g.(map[string]interface{}); ok {
+								graphid, _ := graphMap["graphid"].(string)
+								graphName, _ := graphMap["name"].(string)
+
+								// 检查图形名称是否在请求的列表中
+								for _, requestedName := range graphNames {
+									if graphName == requestedName {
+										hostGraphMap[hostname][graphName] = graphid
+										logger.L().Debugf("映射: %s -> %s -> %s", hostname, graphName, graphid)
+										break
+									}
+								}
+							}
+						}
+					}
+				}
+			} else {
+				logger.L().Warnf("批量查询主机及图形失败: %v", callErr)
+			}
+		}
+	} // 按主机分列，每个主机一列，每列包含多个图形（垂直排列）
+	for hostIdx, host := range hosts {
+		if hostIdx >= maxCols {
+			break // 超过最大列数，停止
+		}
+
+		if hidStr, ok := hostNameToID[host]; ok {
+			// 将 hostid 转换为数字
+			hidNum, err := strconv.Atoi(hidStr)
+			if err != nil {
+				logger.L().Warnf("主机 %s 的 hostid %s 不是有效数字，跳过", host, hidStr)
+				continue
+			}
+
+			// 该列的 x 坐标（固定）
+			x := hostIdx * widgetWidth
+
+			// 为该主机创建所有图形，垂直排列
+			for graphIdx, graphName := range graphNames {
+				if graphIdx >= maxRows {
+					break // 超过最大行数，停止
+				}
+
+				// 从映射中获取图形ID
+				graphid := ""
+				if hostMap, ok := hostGraphMap[host]; ok {
+					graphid = hostMap[graphName]
+				}
+
+				// y 坐标根据图形索引递增（垂直排列）
+				y := graphIdx * widgetHeight
+
+				w := models.DashboardWidget{
+					Name: fmt.Sprintf("%s - %s", host, graphName),
+					X:    &x,
+					Y:    &y,
+				}
+				w.Width = &widgetWidth
+				w.Height = &widgetHeight
+
+				var fields []models.DashboardWidgetField
+
+				if graphid != "" {
+					// 图形存在，创建 graph widget
+					w.Type = models.WidgetTypeGraph
+					fields = []models.DashboardWidgetField{
+						{Type: 6, Name: "graphid", Value: graphid},
+						{Type: 3, Name: "hostids", Value: hidNum},
+					}
+				} else {
+					// 图形不存在，创建 text widget 作为占位符
+					w.Type = models.WidgetTypeText
+					textContent := fmt.Sprintf("图形不存在: %s\n主机: %s", graphName, host)
+					fields = []models.DashboardWidgetField{
+						{Type: 0, Name: "text_size", Value: 12},     // text_size 字段类型为 0（整数）
+						{Type: 1, Name: "text", Value: textContent}, // text 字段类型为 1（字符串）
+					}
+					logger.L().Debugf("主机 %s 的图形 %s 不存在，创建文本占位组件", host, graphName)
+				}
+
+				w.Fields = fields
+				widgets = append(widgets, w)
+			}
+		}
+	}
+	return widgets
+} // queryGraphIDByName 根据主机和图形名称查询 graphid
+func queryGraphIDByName(ctx context.Context, hostname, graphName, instanceName string) string {
+	if clientPool == nil {
+		return ""
+	}
+
+	// 先获取主机ID
+	specHosts := models.HostParams{Output: []string{"hostid"}}
+	specHosts.Filter = map[string]interface{}{"host": []string{hostname}}
+	hostList, err := server.GetHosts(ctx, clientPool, specHosts, instanceName)
+	if err != nil || len(hostList) == 0 {
+		return ""
+	}
+
+	hostid := ""
+	if v, ok := hostList[0]["hostid"].(string); ok {
+		hostid = v
+	}
+
+	if hostid == "" {
+		return ""
+	}
+
+	// 查询该主机下的图形
+	specGraphs := models.GraphParams{
+		Output: []string{"graphid", "name"},
+		Filter: map[string]interface{}{"name": graphName},
+	}
+	// 添加 hostids 过滤
+	specGraphs.Filter["hostids"] = hostid
+
+	var lease zabbix.ClientLease
+	if instanceName != "" {
+		lease, err = clientPool.AcquireByInstance(ctx, instanceName)
+	} else {
+		lease, err = clientPool.Acquire(ctx)
+	}
+	if err != nil || lease == nil {
+		return ""
+	}
+
+	client := lease.Client()
+	adapted := client.AdaptAPIParams("graph.get", specGraphs)
+	var graphList []map[string]interface{}
+	callErr := client.Call(ctx, "graph.get", adapted, &graphList)
+	lease.Release(callErr)
+
+	if callErr != nil || len(graphList) == 0 {
+		return ""
+	}
+
+	if v, ok := graphList[0]["graphid"].(string); ok {
+		return v
+	}
+
+	return ""
+}
+
+// queryGraphNameByID 根据 graphid 查询图形名称
+func queryGraphNameByID(ctx context.Context, graphid, instanceName string) string {
+	if clientPool == nil {
+		return ""
+	}
+
+	specGraphs := models.GraphParams{
+		GraphIDs: []string{graphid},
+		Output:   []string{"graphid", "name"},
+	}
+
+	var lease zabbix.ClientLease
+	var err error
+	if instanceName != "" {
+		lease, err = clientPool.AcquireByInstance(ctx, instanceName)
+	} else {
+		lease, err = clientPool.Acquire(ctx)
+	}
+	if err != nil || lease == nil {
+		return ""
+	}
+
+	client := lease.Client()
+	adapted := client.AdaptAPIParams("graph.get", specGraphs)
+	var graphList []map[string]interface{}
+	callErr := client.Call(ctx, "graph.get", adapted, &graphList)
+	lease.Release(callErr)
+
+	if callErr != nil || len(graphList) == 0 {
+		return ""
+	}
+
+	if v, ok := graphList[0]["name"].(string); ok {
+		return v
+	}
+
+	return ""
 }

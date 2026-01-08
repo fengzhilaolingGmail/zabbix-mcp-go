@@ -2,7 +2,7 @@
  * @Author: fengzhilaoling fengzhilaoling@gmail.com
  * @Date: 2026-01-02 15:33:32
  * @LastEditors: fengzhilaoling
- * @LastEditTime: 2026-01-06 09:00:08
+ * @LastEditTime: 2026-01-08 13:57:08
  * @FilePath: \zabbix-mcp-go\register\host.go
  * @Description: 文件解释
  * Copyright (c) 2026 by fengzhilaoling@gmail.com, All Rights Reserved.
@@ -56,10 +56,18 @@ func registerHost(s *server.MCPServer) {
 		mcp.NewTool("create_host",
 			mcp.WithDescription("在指定实例中创建主机"),
 			mcp.WithString("instance", mcp.Required(), mcp.Description("Zabbix 实例名称")),
-			mcp.WithString("host", mcp.Required(), mcp.Required(), mcp.Description("主机技术名,host 字段")),
+			mcp.WithString("host", mcp.Required(), mcp.Description("主机技术名,host 字段")),
 			mcp.WithString("name", mcp.Required(), mcp.Description("主机可见名称")),
 			mcp.WithArray("groups", mcp.Required(), mcp.Description("主机组对象数组,指定 groupid 字段")),
-			mcp.WithArray("interfaces", mcp.Description("主机接口数组")),
+			mcp.WithArray("interfaces", mcp.Description(`主机接口数组，元素为对象，必须字段：
+		{
+		  "type":  1,        // int，1=Agent 2=SNMP 3=IPMI 4=JMX
+		  "main":  1,        // int，1 主接口 0 非主（只能有一个主）
+		  "useip": 1,        // int，1 用 IP 0 用 DNS
+		  "ip":    "1.1.1.1",// string，当 useip=1 时必填
+		  "dns":   "",       // string，当 useip=0 时必填
+		  "port":  "10050"   // string，端口
+		}`)),
 			mcp.WithArray("templateids", mcp.Description("模板ID数组")),
 			mcp.WithArray("templates", mcp.Description("模板对象数组，包含 templateid 字段")),
 			mcp.WithArray("tags", mcp.Description("主机标签数组")),
@@ -87,5 +95,15 @@ func registerHost(s *server.MCPServer) {
 			mcp.WithObject("inventory", mcp.Description("主机资产清单对象，用于替换清单")),
 		),
 		handler.UpdateHostHandler,
+	)
+	//
+	s.AddTool(
+		mcp.NewTool("get_host_graphs", mcp.WithDescription("获取主机列表的图形"),
+			mcp.WithString("instance", mcp.Required(), mcp.Description("Zabbix实例名称必须填")),
+			mcp.WithArray("hostids", mcp.Required(), mcp.Description("主机ID列表")),
+			mcp.WithBoolean("is_detailed", mcp.Required(), mcp.Description("是否查询详细信息: 默认 false")),
+			mcp.WithString("style", mcp.Required(), mcp.Description("默认:graphs 表示获取图形")),
+		),
+		handler.GetHostsRefineHandler,
 	)
 }

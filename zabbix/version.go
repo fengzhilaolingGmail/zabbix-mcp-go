@@ -2,7 +2,7 @@
  * @Author: fengzhilaoling fengzhilaoling@gmail.com
  * @Date: 2025-12-16 20:54:52
  * @LastEditors: fengzhilaoling
- * @LastEditTime: 2025-12-20 15:25:16
+ * @LastEditTime: 2026-01-08 12:46:40
  * @FilePath: \zabbix-mcp-go\zabbix\version.go
  * @Description: 版本检测相关功能
  * Copyright (c) 2025 by fengzhilaoling@gmail.com, All Rights Reserved.
@@ -288,6 +288,414 @@ func (vd *VersionDetector) AdaptAPIParams(method string, spec models.ParamSpec) 
 	case "template.get":
 		if version.Major < 5 {
 			delete(adaptedParams, "selectTags")
+		}
+	// ========================= dashboard 仪表盘 =========================
+	case "dashboard.create":
+		// helper to convert various numeric types to int
+		toInt := func(v interface{}) (int, bool) {
+			switch t := v.(type) {
+			case int:
+				return t, true
+			case int32:
+				return int(t), true
+			case int64:
+				return int(t), true
+			case float64:
+				return int(t), true
+			case float32:
+				return int(t), true
+			case string:
+				if n, err := strconv.Atoi(t); err == nil {
+					return n, true
+				}
+			}
+			return 0, false
+		}
+
+		if version.Major < 6 {
+			// Zabbix 5.x: 将 pages 转换为 widgets，并支持自动分页
+			// Zabbix 5.x 限制：x:0-23, y:0-63, width:1-24, height:1-32
+			if pages, ok := adaptedParams["pages"]; ok {
+				var allWidgets []interface{}
+				// 提取所有 widgets
+				extract := func(w interface{}) {
+					switch ws := w.(type) {
+					case []interface{}:
+						allWidgets = append(allWidgets, ws...)
+					case []map[string]interface{}:
+						for _, it := range ws {
+							allWidgets = append(allWidgets, it)
+						}
+					case map[string]interface{}:
+						allWidgets = append(allWidgets, ws)
+					}
+				}
+
+				switch p := pages.(type) {
+				case []interface{}:
+					for _, page := range p {
+						if pm, ok := page.(map[string]interface{}); ok {
+							if w, ok := pm["widgets"]; ok {
+								extract(w)
+							}
+						}
+					}
+				case []map[string]interface{}:
+					for _, pm := range p {
+						if w, ok := pm["widgets"]; ok {
+							extract(w)
+						}
+					}
+				case map[string]interface{}:
+					if w, ok := p["widgets"]; ok {
+						extract(w)
+					}
+				}
+
+				// 处理 widgets：维度限制 + 避免重叠 + 重新计算坐标
+				// Zabbix 5.x 是单页结构，需要确保 widgets 不重叠且坐标在范围内
+				occupiedCells := make(map[string]bool) // 记录已占用的单元格 "x,y"
+				gridCols := 24                         // Zabbix 5.x 网格列数
+				gridRows := 64                         // Zabbix 5.x 网格行数
+
+				// 重新计算布局：按列分组，每列垂直排列
+				// 统计不同 x 值的数量（列数）
+				xValues := make(map[int]bool)
+				for _, wi := range allWidgets {
+					if wm, ok := wi.(map[string]interface{}); ok {
+						if xv, ok := wm["x"]; ok {
+							if n, ok2 := toInt(xv); ok2 {
+								xValues[n] = true
+							}
+						}
+					}
+				}
+
+				// 计算新的列数和 widget 尺寸
+				numCols := len(xValues)
+				if numCols == 0 {
+					numCols = 1
+				}
+				if numCols > gridCols {
+					numCols = gridCols
+				}
+
+				widgetWidth := gridCols / numCols
+				if widgetWidth < 1 {
+					widgetWidth = 1
+				}
+
+				// 按列重新排列 widgets
+				columnWidgets := make(map[int][]map[string]interface{})
+				for _, wi := range allWidgets {
+					if wm, ok := wi.(map[string]interface{}); ok {
+						colIdx := 0
+						if xv, ok := wm["x"]; ok {
+							if n, ok2 := toInt(xv); ok2 {
+								// 将原始 x 映射到列索引（假设原始使用 72 列计算）
+								colIdx = n / (72 / numCols)
+								if colIdx < 0 {
+									colIdx = 0
+								} else if colIdx >= numCols {
+									colIdx = numCols - 1
+								}
+							}
+						}
+						columnWidgets[colIdx] = append(columnWidgets[colIdx], wm)
+					}
+				}
+
+				// 重新计算所有 widgets 的位置
+				newWidgets := make([]interface{}, 0)
+				for colIdx := 0; colIdx < numCols; colIdx++ {
+					widgetsInCol := columnWidgets[colIdx]
+					// 按 y 排序
+					for i := 0; i < len(widgetsInCol); i++ {
+						for j := i + 1; j < len(widgetsInCol); j++ {
+							y1, y2 := 0, 0
+							if yv, ok := widgetsInCol[i]["y"]; ok {
+								if n, ok2 := toInt(yv); ok2 {
+									y1 = n
+								}
+							}
+							if yv, ok := widgetsInCol[j]["y"]; ok {
+								if n, ok2 := toInt(yv); ok2 {
+									y2 = n
+								}
+							}
+							if y1 > y2 {
+								widgetsInCol[i], widgetsInCol[j] = widgetsInCol[j], widgetsInCol[i]
+							}
+						}
+					}
+
+					// 重新计算该列中每个 widget 的位置
+					x := colIdx * widgetWidth
+					for rowIdx, wm := range widgetsInCol {
+						// 获取并限制维度
+						height := 5
+						if hv, ok := wm["height"]; ok {
+							if n, ok2 := toInt(hv); ok2 {
+								height = n
+							}
+						}
+
+						// Clamp height to 1-32
+						if height < 1 {
+							height = 1
+						} else if height > 32 {
+							height = 32
+						}
+						wm["height"] = height
+
+						// Clamp width to 1-24
+						wm["width"] = widgetWidth
+
+						// 计算 y 坐标（垂直排列）
+						y := rowIdx * height
+						if y > 63 {
+							break // 超出最大行数，停止添加该列的剩余 widgets
+						}
+
+						// 检查并避免位置冲突
+						conflict := false
+						for dy := 0; dy < height; dy++ {
+							for dx := 0; dx < widgetWidth; dx++ {
+								key := fmt.Sprintf("%d,%d", x+dx, y+dy)
+								if occupiedCells[key] {
+									conflict = true
+									break
+								}
+							}
+							if conflict {
+								break
+							}
+						}
+
+						if conflict {
+							// 找到新的位置（简单策略：顺序查找空位）
+							found := false
+							for newY := 0; newY <= gridRows-height && !found; newY++ {
+								for newX := 0; newX <= gridCols-widgetWidth && !found; newX++ {
+									valid := true
+									for dy := 0; dy < height; dy++ {
+										for dx := 0; dx < widgetWidth; dx++ {
+											key := fmt.Sprintf("%d,%d", newX+dx, newY+dy)
+											if occupiedCells[key] {
+												valid = false
+												break
+											}
+										}
+										if !valid {
+											break
+										}
+									}
+									if valid {
+										x, y = newX, newY
+										found = true
+									}
+								}
+							}
+							if !found {
+								// 如果找不到位置，跳过此 widget
+								continue
+							}
+						}
+
+						// 更新 widget 位置
+						wm["x"] = x
+						wm["y"] = y
+
+						// 标记占用的单元格
+						for dy := 0; dy < height; dy++ {
+							for dx := 0; dx < widgetWidth; dx++ {
+								key := fmt.Sprintf("%d,%d", x+dx, y+dy)
+								occupiedCells[key] = true
+							}
+						}
+
+						newWidgets = append(newWidgets, wm)
+					}
+				}
+
+				adaptedParams["widgets"] = newWidgets
+				delete(adaptedParams, "pages")
+			}
+		} else {
+			// Zabbix 6.x+ 版本：x 范围 0-71，y 范围 0-6，超出时自动分页
+			if pages, ok := adaptedParams["pages"]; ok {
+				// helper to convert various numeric types to int
+				toInt := func(v interface{}) (int, bool) {
+					switch t := v.(type) {
+					case int:
+						return t, true
+					case int32:
+						return int(t), true
+					case int64:
+						return int(t), true
+					case float64:
+						return int(t), true
+					case float32:
+						return int(t), true
+					case string:
+						if n, err := strconv.Atoi(t); err == nil {
+							return n, true
+						}
+					}
+					return 0, false
+				}
+
+				// Process pages and split widgets that exceed y=6
+				switch p := pages.(type) {
+				case []interface{}:
+					var newPages []interface{}
+					for _, page := range p {
+						if pm, ok := page.(map[string]interface{}); ok {
+							newPages = append(newPages, pm)
+						}
+					}
+					adaptedParams["pages"] = newPages
+				case []map[string]interface{}:
+					var newPages []interface{}
+					for _, pm := range p {
+						newPages = append(newPages, pm)
+					}
+					adaptedParams["pages"] = newPages
+				case map[string]interface{}:
+					adaptedParams["pages"] = []interface{}{p}
+				}
+
+				// Auto-pagination: split widgets that exceed y=6 into new pages
+				if pagesArr, ok := adaptedParams["pages"].([]interface{}); ok {
+					var allPages []interface{}
+					pageCounter := 0
+
+					for _, page := range pagesArr {
+						if pm, ok := page.(map[string]interface{}); ok {
+							if widgets, ok := pm["widgets"]; ok {
+								// Extract all widgets from this page
+								var allWidgets []interface{}
+								switch ws := widgets.(type) {
+								case []interface{}:
+									allWidgets = ws
+								case []map[string]interface{}:
+									for _, w := range ws {
+										allWidgets = append(allWidgets, w)
+									}
+								case map[string]interface{}:
+									allWidgets = []interface{}{ws}
+								}
+
+								// Split widgets into pages based on y position
+								pageWidgets := make([][]interface{}, 0)
+								currentPage := make([]interface{}, 0)
+
+								for _, wi := range allWidgets {
+									if wm, ok := wi.(map[string]interface{}); ok {
+										// Get widget y position and height
+										y := 0
+										if yv, ok := wm["y"]; ok {
+											if n, ok2 := toInt(yv); ok2 {
+												y = n
+											}
+										}
+
+										height := 5 // default height
+										if hv, ok := wm["height"]; ok {
+											if n, ok2 := toInt(hv); ok2 {
+												height = n
+											}
+										}
+
+										// Clamp width to 1-72
+										width := 72
+										if wv, ok := wm["width"]; ok {
+											if n, ok2 := toInt(wv); ok2 {
+												if n < 1 {
+													n = 1
+												} else if n > 72 {
+													n = 72
+												}
+												wm["width"] = n
+												width = n
+											}
+										}
+
+										// Clamp x to 0-(72-width)
+										if xv, ok := wm["x"]; ok {
+											if n, ok2 := toInt(xv); ok2 {
+												maxX := 72 - width
+												if n < 0 {
+													n = 0
+												} else if n > maxX {
+													n = maxX
+												}
+												wm["x"] = n
+											}
+										}
+
+										// Clamp y to 0-63
+										if yv, ok := wm["y"]; ok {
+											if n, ok2 := toInt(yv); ok2 {
+												if n < 0 {
+													n = 0
+												} else if n > 63 {
+													n = 63
+												}
+												wm["y"] = n
+												y = n // Update y with clamped value
+											}
+										} // Clamp height to 1-64
+										if hv, ok := wm["height"]; ok {
+											if n, ok2 := toInt(hv); ok2 {
+												if n < 1 {
+													n = 1
+												} else if n > 64 {
+													n = 64
+												}
+												wm["height"] = n
+												height = n // Update height with clamped value
+											}
+										}
+
+										// Check if widget fits in current page (y <= 63)
+										if y <= 63 && y+height-1 <= 63 {
+											currentPage = append(currentPage, wm)
+										} else {
+											// Start a new page
+											if len(currentPage) > 0 {
+												pageWidgets = append(pageWidgets, currentPage)
+												currentPage = make([]interface{}, 0)
+											}
+											// Adjust y position for new page
+											wm["y"] = 0
+											currentPage = append(currentPage, wm)
+										}
+									}
+								}
+
+								if len(currentPage) > 0 {
+									pageWidgets = append(pageWidgets, currentPage)
+								}
+
+								// Create new pages with the split widgets
+								for _, widgets := range pageWidgets {
+									newPage := make(map[string]interface{})
+									for k, v := range pm {
+										if k != "widgets" {
+											newPage[k] = v
+										}
+									}
+									newPage["widgets"] = widgets
+									allPages = append(allPages, newPage)
+									pageCounter++
+								}
+							}
+						}
+					}
+					adaptedParams["pages"] = allPages
+				}
+			}
 		}
 	}
 
