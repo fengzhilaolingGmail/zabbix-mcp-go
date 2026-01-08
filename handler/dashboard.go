@@ -2,7 +2,7 @@
  * @Author: fengzhilaoling fengzhilaoling@gmail.com
  * @Date: 2026-01-06 18:59:21
  * @LastEditors: fengzhilaoling
- * @LastEditTime: 2026-01-08 15:25:15
+ * @LastEditTime: 2026-01-08 17:29:55
  * @FilePath: \zabbix-mcp-go\handler\dashboard.go
  * @Description: 仪表盘相关功能
  * @Copyright: Copyright (c) 2025 by fengzhilaoling@gmail.com, All Rights Reserved.
@@ -13,6 +13,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"zabbixMcp/logger"
 	"zabbixMcp/models"
@@ -569,11 +570,11 @@ func buildAggregateModeWidgets(hosts []string, hostNameToID map[string]string, g
 								graphid, _ := graphMap["graphid"].(string)
 								graphName, _ := graphMap["name"].(string)
 
-								// 检查图形名称是否在请求的列表中
+								// 检查图形名称是否在请求的列表中（支持模糊匹配）
 								for _, requestedName := range graphNames {
-									if graphName == requestedName {
-										hostGraphMap[hostname][graphName] = graphid
-										logger.L().Debugf("映射: %s -> %s -> %s", hostname, graphName, graphid)
+									if strings.Contains(graphName, requestedName) {
+										hostGraphMap[hostname][requestedName] = graphid
+										logger.L().Debugf("映射: %s -> %s -> %s", hostname, requestedName, graphid)
 										break
 									}
 								}
@@ -732,11 +733,11 @@ func buildSeparateModeWidgets(hosts []string, hostNameToID map[string]string, gr
 								graphid, _ := graphMap["graphid"].(string)
 								graphName, _ := graphMap["name"].(string)
 
-								// 检查图形名称是否在请求的列表中
+								// 检查图形名称是否在请求的列表中（支持模糊匹配）
 								for _, requestedName := range graphNames {
-									if graphName == requestedName {
-										hostGraphMap[hostname][graphName] = graphid
-										logger.L().Debugf("映射: %s -> %s -> %s", hostname, graphName, graphid)
+									if strings.Contains(graphName, requestedName) {
+										hostGraphMap[hostname][requestedName] = graphid
+										logger.L().Debugf("映射: %s -> %s -> %s", hostname, requestedName, graphid)
 										break
 									}
 								}
