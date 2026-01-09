@@ -20,10 +20,13 @@
 | 通过主机名查找 | `find_host_by_name` | 通过主机名（数组）查询主机，支持开启 `search` 进行模糊匹配，并可控制返回字段 | `instance`、`hostnames[]`、`search`、各类 `select_*` | `[]map[string]interface{}`，对应 Zabbix `host.get` |
 | 主机创建 | `create_host` | 在指定实例中创建主机，要求指定主机名与主机组；支持接口、模板链接、标签、用户宏与清单信息 | `instance`、`host`（必填）、`name`、`groups[]`(仅 `groupid`)、`interfaces[]`、`templateids[]`/`templates[]`、`tags[]`、`macros[]`、`inventory` | `map[string]interface{}`，对应 `host.create` 的返回结果（包含 hostid） |
 | 主机更新 | `update_host` | 更新主机属性（替换式语义）：传入的 `groups`/`interfaces`/`templates`/`tags`/`macros` 会替换当前关联，未列出的将被移除；要求指定单个 `hostid` 进行更新 | `instance`、`hostid`（必填）、`host`、`name`、`groups[]`(仅 `groupid`)、`interfaces[]`、`templates[]`、`templates_clear[]`、`tags[]`、`macros[]`、`inventory` | `map[string]interface{}`，对应 `host.update` 的返回结果 |
+| 主机图形查询 | `get_host_graphs` | 获取主机列表的图形信息 | `instance`（必填）、`hostids[]`（必填）、`is_detailed`、`style` | 主机图形列表 |
 | 监控项查询 | `get_items` | 按实例查询监控项，支持按主机 ID/主机名或监控项 key/name 过滤（至少需提供主机或监控项过滤之一） | `instance`（必填）、`host_ids` / `hostname`、`item_key` / `item_name` | `[]map[string]interface{}`，对应 Zabbix `item.get` 的结果 |
 | 历史数据（按时间） | `get_history_by_time` | 按明确开始/结束时间范围获取历史数据，支持是否汇总与历史类型选择 | `instance`（必填）、`host_ids[]`（必填）、`item_ids[]`（必填）、`start_time`（必填）、`end_time`（必填）、`summary`、`history` | 历史数据数组或汇总结果，视 `summary` 与 `history` 而定 |
 | 历史数据（按范围） | `get_history_by_range` | 按相对时间范围（例如 `7d 15h`）获取历史数据，适合快速区间查询 | `instance`（必填）、`host_ids[]`（必填）、`item_ids[]`（必填）、`time_range`（必填）、`summary`、`history` | 历史数据数组或汇总结果 |
 | 历史同比/环比对比 | `get_history_compare` | 获取当前区间与前一周期（previous）对比的数据，支持按日/小时/分钟粒度与百分比格式化；当使用分钟粒度时（period=`minute`），需通过 `minute_interval` 指定 1/5/15/30 分钟，并且查询范围必须 ≤ 6 小时。 | `instance`（必填）、`host_ids[]`（必填）、`item_ids[]`（必填）、`start_time`/`end_time` 或 `time_range`、`period`（`day`/`hour`/`minute`）、`minute_interval`（仅在 `minute` 时生效，1/5/15/30）、`pct_format`、`timezone`、`history` | 返回包含 current 与 previous 两个时间段数据及汇总/同比变化的结构 |
+| 仪表盘创建 | `create_dashboard` | 在指定实例中创建仪表盘，支持自定义页面、组件、共享设置等 | `instance`（必填）、`name`（必填）、`pages`、`userid`、`private`、`display_period`、`auto_start`、`users`、`userGroups` | 仪表盘创建结果 |
+| 图形仪表盘创建 | `create_graph_dashboard` | 自动创建图形仪表盘，支持聚合模式（多台主机相同图形）和分列模式（每台主机不同图形） | `instance`（必填）、`name`（必填）、`mode`（必填）、`hosts[]`（必填）、`graph_names[]`（必填）、`max_cols`、`max_rows` | 图形仪表盘创建结果 |
 
 > ✅ 上述工具均已在 `register/` 下完成注册，可直接通过 MCP Server 暴露给客户端。
 
