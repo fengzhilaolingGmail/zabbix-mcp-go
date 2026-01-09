@@ -2,7 +2,7 @@
  * @Author: fengzhilaoling fengzhilaoling@gmail.com
  * @Date: 2025-12-16 20:54:52
  * @LastEditors: fengzhilaoling
- * @LastEditTime: 2026-01-08 12:46:40
+ * @LastEditTime: 2026-01-09 15:39:35
  * @FilePath: \zabbix-mcp-go\zabbix\version.go
  * @Description: 版本检测相关功能
  * Copyright (c) 2025 by fengzhilaoling@gmail.com, All Rights Reserved.
@@ -290,6 +290,11 @@ func (vd *VersionDetector) AdaptAPIParams(method string, spec models.ParamSpec) 
 			delete(adaptedParams, "selectTags")
 		}
 	// ========================= dashboard 仪表盘 =========================
+	case "dashboard.get":
+		if version.Major < 6 {
+			delete(adaptedParams, "selectPages")
+			adaptedParams["selectWidgets"] = "extend"
+		}
 	case "dashboard.create":
 		// helper to convert various numeric types to int
 		toInt := func(v interface{}) (int, bool) {

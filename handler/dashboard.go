@@ -2,7 +2,7 @@
  * @Author: fengzhilaoling fengzhilaoling@gmail.com
  * @Date: 2026-01-06 18:59:21
  * @LastEditors: fengzhilaoling
- * @LastEditTime: 2026-01-09 14:38:40
+ * @LastEditTime: 2026-01-09 16:38:55
  * @FilePath: \zabbix-mcp-go\handler\dashboard.go
  * @Description: 仪表盘相关功能
  * @Copyright: Copyright (c) 2025 by fengzhilaoling@gmail.com, All Rights Reserved.
@@ -258,6 +258,46 @@ func GetDashboardHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.Cal
 	dashboard, err := server.GetDashboard(ctx, clientPool, spec, instance)
 	if err != nil {
 		return nil, fmt.Errorf("调用 dashboard.get 失败: %w", err)
+	}
+	return mcp.NewToolResultStructuredOnly(makeResult(dashboard)), nil
+}
+
+// DeleteDashboardHandler 删除仪表盘
+func DeleteDashboardHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	instanceName := ""
+	dashboardIDs := []string{}
+	if args, ok := req.Params.Arguments.(map[string]interface{}); ok {
+		if v, ok2 := args["instance"].(string); ok2 {
+			instanceName = v
+		}
+		if arr, ok := args["dashboard_ids"].([]interface{}); ok {
+			for _, v := range arr {
+				if s, ok := v.(string); ok && s != "" {
+					dashboardIDs = append(dashboardIDs, s)
+				}
+				if s, ok := v.(int64); ok && s != 0 {
+					dashboardIDs = append(dashboardIDs, strconv.FormatInt(s, 10))
+				}
+			}
+		}
+
+		if v, ok := args["dashboard_ids"].(string); ok && v != "" {
+			dashboardIDs = append(dashboardIDs, v)
+		}
+		if v, ok := args["dashboard_ids"].(int64); ok && v != 0 {
+			dashboardIDs = append(dashboardIDs, strconv.FormatInt(v, 10))
+		}
+	}
+	if clientPool == nil {
+		return mcp.NewToolResultStructuredOnly(makeResult([]map[string]interface{}{})), nil
+	}
+	spec := models.DashboardParams{DashboardIDs: dashboardIDs}
+	logger.L().Infof("调用 dashboard.delete 传入参数: %v", spec)
+	logger.L().Infof("传入参数: %v", dashboardIDs)
+	dashboard, err := server.DeleteDashboard(ctx, clientPool, spec, instanceName)
+	if err != nil {
+		logger.L().Errorf("调用 dashboard.delete 失败: %w", err)
+		return nil, fmt.Errorf("调用 dashboard.delete 失败: %w", err)
 	}
 	return mcp.NewToolResultStructuredOnly(makeResult(dashboard)), nil
 }
