@@ -2,7 +2,7 @@
  * @Author: fengzhilaoling fengzhilaoling@gmail.com
  * @Date: 2026-01-06 19:05:52
  * @LastEditors: fengzhilaoling
- * @LastEditTime: 2026-01-08 14:35:40
+ * @LastEditTime: 2026-01-09 14:12:52
  * @FilePath: \zabbix-mcp-go\register\dashboard.go
  * @Description: 仪表盘注册
  * @Copyright: Copyright (c) 2025 by fengzhilaoling@gmail.com, All Rights Reserved.
@@ -17,6 +17,18 @@ import (
 )
 
 func registerDashboard(s *server.MCPServer) {
+	s.AddTool(
+		mcp.NewTool("get_dashboard",
+			mcp.WithDescription("自动创建图形仪表盘，支持两种模式：1) 多台主机相同图形名称聚合 2) 每台主机不同图形分列显示"),
+			mcp.WithString("instance", mcp.Required(), mcp.Description("Zabbix 实例名称")),
+			mcp.WithString("dashboard_name", mcp.Required(), mcp.Description("仪表盘名称")),
+			mcp.WithBoolean("select_users", mcp.Description("查看仪表盘共享用户列表")),
+			mcp.WithBoolean("select_usergroups", mcp.Description("查看仪表盘共享用户组列表")),
+			mcp.WithBoolean("select_pages", mcp.Description("查看仪表盘页面列表")),
+		),
+		handler.GetDashboardHandler,
+	)
+
 	s.AddTool(
 		mcp.NewTool("create_dashboard",
 			mcp.WithDescription("在指定实例中创建仪表盘"),
