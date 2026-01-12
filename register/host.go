@@ -2,7 +2,7 @@
  * @Author: fengzhilaoling fengzhilaoling@gmail.com
  * @Date: 2026-01-02 15:33:32
  * @LastEditors: fengzhilaoling
- * @LastEditTime: 2026-01-12 13:28:45
+ * @LastEditTime: 2026-01-12 13:32:13
  * @FilePath: \zabbix-mcp-go\register\host.go
  * @Description: 文件解释
  * Copyright (c) 2026 by fengzhilaoling@gmail.com, All Rights Reserved.
@@ -194,19 +194,6 @@ func registerGetHost(s *server.MCPServer) {
 }
 
 func registerHost(s *server.MCPServer) {
-
-	// s.AddTool( macros
-	// 	mcp.NewTool("find_host_by_name", mcp.WithDescription("通过主机名称获取主机信息,模糊匹配需要启用search参数"),
-	// 		mcp.WithString("instance", mcp.Required(), mcp.Description("Zabbix实例名称必须填")),
-	// 		mcp.WithArray("hostnames", mcp.Required(), mcp.Description("主机名称列表")),
-	// 		mcp.WithBoolean("select_host_discovery", mcp.Description("是否查询主机发现数据")),
-	// 		mcp.WithBoolean("select_http_tests", mcp.Description("是否查询主机Web检查")),
-	// 		mcp.WithBoolean("select_interfaces", mcp.Description("是否查询主机接口")),
-	// 		mcp.WithBoolean("select_inventory", mcp.Description("是否查询主机清单数据")),
-	// 		mcp.WithBoolean("select_inherited_tags", mcp.Description("是否查询主机继承标签")),
-	// 	),
-	// 	handler.GetHostsHandler,
-	// )
 	s.AddTool(
 		mcp.NewTool("create_host",
 			mcp.WithDescription("在指定实例中创建主机"),
