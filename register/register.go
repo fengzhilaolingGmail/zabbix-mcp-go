@@ -18,6 +18,7 @@ func Registers(s *server.MCPServer) {
 	registerInstances(s)
 	registerUser(s)
 	registerUserGroup(s)
+	registerGetHost(s)
 	registerHost(s)
 	registerItem(s)
 	registerHistory(s)

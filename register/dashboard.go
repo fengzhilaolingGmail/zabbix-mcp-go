@@ -2,7 +2,7 @@
  * @Author: fengzhilaoling fengzhilaoling@gmail.com
  * @Date: 2026-01-06 19:05:52
  * @LastEditors: fengzhilaoling
- * @LastEditTime: 2026-01-08 14:35:40
+ * @LastEditTime: 2026-01-09 15:40:05
  * @FilePath: \zabbix-mcp-go\register\dashboard.go
  * @Description: 仪表盘注册
  * @Copyright: Copyright (c) 2025 by fengzhilaoling@gmail.com, All Rights Reserved.
@@ -17,6 +17,18 @@ import (
 )
 
 func registerDashboard(s *server.MCPServer) {
+	s.AddTool(
+		mcp.NewTool("get_dashboard",
+			mcp.WithDescription("获取指定实例中的仪表盘信息"),
+			mcp.WithString("instance", mcp.Required(), mcp.Description("Zabbix 实例名称")),
+			mcp.WithString("dashboard_name", mcp.Required(), mcp.Description("仪表盘名称")),
+			mcp.WithBoolean("select_users", mcp.Description("查看仪表盘共享用户列表")),
+			mcp.WithBoolean("select_usergroups", mcp.Description("查看仪表盘共享用户组列表")),
+			mcp.WithBoolean("select_pages", mcp.Description("查看仪表盘页面列表")),
+		),
+		handler.GetDashboardHandler,
+	)
+
 	s.AddTool(
 		mcp.NewTool("create_dashboard",
 			mcp.WithDescription("在指定实例中创建仪表盘"),
@@ -45,5 +57,14 @@ func registerDashboard(s *server.MCPServer) {
 			mcp.WithNumber("max_rows", mcp.Description("最大行数（可选，默认10）")),
 		),
 		handler.CreateGraphDashboardHandler,
+	)
+
+	s.AddTool(
+		mcp.NewTool("delete_dashboards",
+			mcp.WithDescription("删除指定实例中的仪表盘"),
+			mcp.WithString("instance", mcp.Required(), mcp.Description("Zabbix 实例名称")),
+			mcp.WithArray("dashboard_ids", mcp.Required(), mcp.Description("仪表盘ID列表")),
+		),
+		handler.DeleteDashboardHandler,
 	)
 }
