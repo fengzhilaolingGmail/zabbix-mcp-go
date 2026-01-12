@@ -2,7 +2,7 @@
  * @Author: fengzhilaoling fengzhilaoling@gmail.com
  * @Date: 2026-01-02 15:33:32
  * @LastEditors: fengzhilaoling
- * @LastEditTime: 2026-01-12 13:32:13
+ * @LastEditTime: 2026-01-12 19:43:31
  * @FilePath: \zabbix-mcp-go\register\host.go
  * @Description: 文件解释
  * Copyright (c) 2026 by fengzhilaoling@gmail.com, All Rights Reserved.
@@ -200,25 +200,20 @@ func registerHost(s *server.MCPServer) {
 			mcp.WithString("instance", mcp.Required(), mcp.Description("Zabbix 实例名称")),
 			mcp.WithString("host", mcp.Required(), mcp.Description("主机技术名,host 字段")),
 			mcp.WithString("name", mcp.Required(), mcp.Description("主机可见名称")),
-			mcp.WithArray("groups", mcp.Required(), mcp.Description("主机组对象数组,指定 groupid 字段")),
-			mcp.WithArray("interfaces", mcp.Description(`主机接口数组，元素为对象，必须字段：
-		{
-		  "type":  1,        // int，1=Agent 2=SNMP 3=IPMI 4=JMX
-		  "main":  1,        // int，1 主接口 0 非主（只能有一个主）
-		  "useip": 1,        // int，1 用 IP 0 用 DNS
-		  "ip":    "1.1.1.1",// string，当 useip=1 时必填
-		  "dns":   "",       // string，当 useip=0 时必填
-		  "port":  "10050"   // string，端口
-		}`)),
-			mcp.WithArray("templateids", mcp.Description("模板ID数组")),
-			mcp.WithArray("templates", mcp.Description("模板对象数组，包含 templateid 字段")),
-			mcp.WithArray("tags", mcp.Description("主机标签数组")),
-			mcp.WithArray("macros", mcp.Description("用户宏数组")),
-			mcp.WithObject("inventory", mcp.Description("主机清单对象")),
+			mcp.WithArray("groups", mcp.Required(), mcp.Description("主机组id列表")),
+			mcp.WithString("type", mcp.Required(), mcp.Description("主机接口类型,1=Agent 2=SNMP 3=IPMI 4=JMX,默认1=Agent"), mcp.DefaultString("1")),
+			mcp.WithString("main", mcp.Required(), mcp.Description("主接口标识,1 主接口 0 非主（只能有一个主）"), mcp.DefaultString("1")),
+			mcp.WithString("useip", mcp.Required(), mcp.Description("1 用 IP 0 用 DNS"), mcp.DefaultString("1")),
+			mcp.WithString("ip", mcp.Required(), mcp.Description("主机IP地址,当 useip=1 时必填")),
+			mcp.WithString("dns", mcp.Required(), mcp.Description("主机DNS名称,当 useip=0 时必填")),
+			mcp.WithString("port", mcp.Required(), mcp.Description("主机端口,默认10050")),
+			mcp.WithArray("templates", mcp.Required(), mcp.Description("模板ID列表")),
+			mcp.WithArray("tags", mcp.Required(), mcp.Description("主机标签数组, 示例: `[{ 'tag': 'tagname', 'value': 'tagvalue' },{ 'tag': 'tagname', 'value': 'tagvalue' }]`")),
+			mcp.WithArray("macros", mcp.Required(), mcp.Description("用户宏数组, 示例: `[{ 'macro': 'macroname', 'value': 'macrovalue', 'description': 'macrodescription' },{ 'macro': 'macroname', 'value': 'macrovalue', 'description': 'macrodescription' }]`")),
+			mcp.WithObject("inventory", mcp.Required(), mcp.Description("主机清单对象, 示例: `{ 'macaddress_a': '01234', 'macaddress_b': '56768' }`")),
 		),
 		handler.CreateHostHandler,
 	)
-	// host.update
 	s.AddTool(
 		mcp.NewTool("update_host",
 			mcp.WithDescription("更新主机属性"),
