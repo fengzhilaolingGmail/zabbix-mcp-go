@@ -2,7 +2,7 @@
  * @Author: fengzhilaoling fengzhilaoling@gmail.com
  * @Date: 2025-12-18 11:20:36
  * @LastEditors: fengzhilaoling
- * @LastEditTime: 2026-01-13 09:36:18
+ * @LastEditTime: 2026-01-13 20:08:13
  * @FilePath: \zabbix-mcp-go\handler\host.go
  * @Description: 主机相关功能
  * @Copyright: Copyright (c) 2025 by fengzhilaoling@gmail.com, All Rights Reserved.
@@ -243,7 +243,7 @@ func GetHostForNameHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.C
 	return mcp.NewToolResultStructuredOnly(makeResult(hosts)), nil
 }
 
-// 主机查询接口
+// 主机分类查询
 func GetHostsHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	instance := ""
 	hostids := []string{}
@@ -387,6 +387,7 @@ func GetHostsHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToo
 	return mcp.NewToolResultStructuredOnly(makeResult(hosts)), nil
 }
 
+// CreateHostHandler 创建主机
 func CreateHostHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	instanceName := ""
 	host := ""
@@ -558,6 +559,55 @@ func CreateHostHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallT
 	if err != nil {
 		logger.L().Errorf("调用 host.create 失败: %v", err)
 		return nil, fmt.Errorf("调用 host.create 失败: %w", err)
+	}
+	return mcp.NewToolResultStructuredOnly(makeResult(result)), nil
+}
+
+func UpdateNewHostHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	instanceName := ""
+	hostid := ""
+	groups := []map[string]interface{}{}
+	style := ""
+	if args, ok := req.Params.Arguments.(map[string]interface{}); ok {
+		if v, ok2 := args["instance"].(string); ok2 {
+			instanceName = v
+		}
+		if v, ok := args["hostid"].(string); ok && v != "" {
+			hostid = v
+		}
+		if v, ok := args["style"].(string); ok && v != "" {
+			style = v
+		}
+		if arr, ok2 := args["groups"].([]interface{}); ok2 {
+			for _, it := range arr {
+				if s, ok3 := it.(string); ok3 && s != "" {
+					groups = append(groups, map[string]interface{}{"groupid": s})
+				}
+			}
+		}
+		if arr, ok2 := args["groups"].([]interface{}); ok2 {
+			for _, it := range arr {
+				if m, ok3 := it.(map[string]interface{}); ok3 {
+					// only keep groupid if present
+					if gid, ok4 := m["groupid"]; ok4 {
+						groups = append(groups, map[string]interface{}{"groupid": gid})
+					}
+				}
+			}
+		}
+	}
+	logger.L().Infof("groups %v", groups)
+	// Build spec using replace semantics for update
+	spec := models.HostParams{}
+	spec.HostID = hostid
+	switch style {
+	case "groups":
+		spec.GroupsReplace = groups
+	}
+	result, err := server.UpdateHost(ctx, clientPool, spec, instanceName)
+	if err != nil {
+		logger.L().Errorf("调用 host.update 失败: %v", err)
+		return nil, fmt.Errorf("调用 host.update 失败: %w", err)
 	}
 	return mcp.NewToolResultStructuredOnly(makeResult(result)), nil
 }
