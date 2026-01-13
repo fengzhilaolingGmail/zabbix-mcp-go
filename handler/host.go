@@ -2,7 +2,7 @@
  * @Author: fengzhilaoling fengzhilaoling@gmail.com
  * @Date: 2025-12-18 11:20:36
  * @LastEditors: fengzhilaoling
- * @LastEditTime: 2026-01-12 19:25:59
+ * @LastEditTime: 2026-01-13 09:36:18
  * @FilePath: \zabbix-mcp-go\handler\host.go
  * @Description: 主机相关功能
  * @Copyright: Copyright (c) 2025 by fengzhilaoling@gmail.com, All Rights Reserved.
@@ -560,4 +560,35 @@ func CreateHostHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallT
 		return nil, fmt.Errorf("调用 host.create 失败: %w", err)
 	}
 	return mcp.NewToolResultStructuredOnly(makeResult(result)), nil
+}
+
+// DeleteHostsHandler 删除主机
+func DeleteHostsHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	instanceName := ""
+	hostIDs := []string{}
+	if args, ok := req.Params.Arguments.(map[string]interface{}); ok {
+		if v, ok2 := args["instance"].(string); ok2 {
+			instanceName = v
+		}
+		if arr, ok := args["hostids"].([]interface{}); ok {
+			for _, v := range arr {
+				if s, ok := v.(string); ok && s != "" {
+					hostIDs = append(hostIDs, s)
+				}
+			}
+		}
+		if v, ok := args["hostid"].(string); ok && v != "" {
+			hostIDs = append(hostIDs, v)
+		}
+	}
+	if clientPool == nil {
+		return mcp.NewToolResultStructuredOnly(makeResult([]map[string]interface{}{})), nil
+	}
+	spec := models.HostParams{HostIDs: hostIDs}
+	hosts, err := server.DeleteHosts(ctx, clientPool, spec, instanceName)
+	if err != nil {
+		logger.L().Errorf("调用 host.delete 失败: %w", err)
+		return nil, fmt.Errorf("调用 host.delete 失败: %w", err)
+	}
+	return mcp.NewToolResultStructuredOnly(makeResult(hosts)), nil
 }

@@ -2,7 +2,7 @@
  * @Author: fengzhilaoling fengzhilaoling@gmail.com
  * @Date: 2026-01-02 15:33:32
  * @LastEditors: fengzhilaoling
- * @LastEditTime: 2026-01-12 19:43:31
+ * @LastEditTime: 2026-01-13 09:35:05
  * @FilePath: \zabbix-mcp-go\register\host.go
  * @Description: 文件解释
  * Copyright (c) 2026 by fengzhilaoling@gmail.com, All Rights Reserved.
@@ -232,5 +232,13 @@ func registerHost(s *server.MCPServer) {
 			mcp.WithObject("inventory", mcp.Description("主机资产清单对象，用于替换清单")),
 		),
 		handler.UpdateHostHandler,
+	)
+	s.AddTool(
+		mcp.NewTool("delete_host",
+			mcp.WithDescription("删除主机"),
+			mcp.WithString("instance", mcp.Required(), mcp.Description("Zabbix 实例名称")),
+			mcp.WithArray("hostids", mcp.Required(), mcp.Description("主机ID数组")),
+		),
+		handler.DeleteHostsHandler,
 	)
 }
