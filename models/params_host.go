@@ -7,82 +7,80 @@ type HostParams struct {
 	// Create-time fields
 	Groups          []map[string]interface{} // groups：用于 host.create，数组或对象，主机组必须只包含 groupid 字段
 	Interfaces      []map[string]interface{} // interfaces：用于 host.create，必须提供接口定义
-	TagsToCreate    []map[string]interface{} // tags：用于 host.create，主机标签
 	TemplatesToLink []map[string]interface{} // templates：用于 host.create 或 update，模板对象应仅包含 templateid
 	MacrosToCreate  []map[string]interface{} // macros：用于 host.create，用户宏定义
 	Inventory       map[string]interface{}   // inventory：用于 host.create/update，主机资产清单
 	// Replace-time fields (用于 update 替换当前对象，未在请求中列出的将被移除)
 	GroupsReplace     []map[string]interface{} // groups：用于替换主机所属主机组，主机组必须只包含 groupid 字段
 	InterfacesReplace []map[string]interface{} // interfaces：用于替换主机接口，请求中未列出的接口将被移除
-	TagsReplace       []Tag                    // tags：用于替换主机标签，请求中未列出的标签将被移除
 	TemplatesReplace  []map[string]interface{} // templates：用于替换关联模板，模板对象应仅包含 templateid
 	TemplatesClear    []map[string]interface{} // templates_clear：用于从主机中解除并清除模板，模板对象仅包含 templateid
 	MacrosReplace     []map[string]interface{} // macros：用于替换用户宏，请求中未列出的宏将被删除
 	// ================================
-	GroupIDs                      []string                 // groupids：仅返回属于指定主机组的主机
-	DServiceIDs                   []string                 // dserviceids：仅返回与指定发现服务相关的主机
-	GraphIDs                      []string                 // graphids：仅返回包含指定图形的主机
-	HostIDs                       []string                 // hostids：仅返回具有指定主机 ID 的主机
-	HostID                        string                   // hostid：单个主机 ID，用于 host.update
-	HTTPTestIDs                   []string                 // httptestids：仅返回包含指定 Web 检查的主机
-	InterfaceIDs                  []string                 // interfaceids：仅返回使用指定接口的主机
-	ItemIDs                       []string                 // itemids：仅返回包含指定监控项的主机
-	MaintenanceIDs                []string                 // maintenanceids：仅返回受指定维护影响的主机
-	MonitoredHosts                bool                     // monitored_hosts：仅返回受监控的主机
-	ProxyIDs                      []string                 // proxyids：仅返回由指定代理监控的主机
-	ProxyGroupIDs                 []string                 // proxy_groupids：仅返回由指定代理组监控的主机
-	TemplatedHosts                bool                     // templated_hosts：同时返回主机和模板
-	TemplateIDs                   []string                 // templateids：仅返回链接到指定模板的主机
-	TriggerIDs                    []string                 // triggerids：仅返回包含指定触发器的主机
-	WithItems                     bool                     // with_items：仅返回包含监控项的主机（覆盖 with_monitored_items 和 with_simple_graph_items）
-	WithItemPrototypes            bool                     // with_item_prototypes：仅返回包含监控项原型的主机（覆盖 with_simple_graph_item_prototypes）
-	WithSimpleGraphItemPrototypes bool                     // with_simple_graph_item_prototypes：仅返回包含数值型监控项原型的主机
-	WithGraphs                    bool                     // with_graphs：仅返回包含图形的主机
-	WithGraphPrototypes           bool                     // with_graph_prototypes：仅返回包含图形原型的主机
-	WithHTTPTests                 bool                     // with_httptests：仅返回包含 Web 检查的主机（覆盖 with_monitored_httptests）
-	WithMonitoredHTTPTests        bool                     // with_monitored_httptests：仅返回包含已启用 Web 检查的主机
-	WithMonitoredItems            bool                     // with_monitored_items：仅返回包含已启用监控项的主机（覆盖 with_simple_graph_items）
-	WithMonitoredTriggers         bool                     // with_monitored_triggers：仅返回包含已启用触发器的主机
-	WithSimpleGraphItems          bool                     // with_simple_graph_items：仅返回包含数值型监控项的主机
-	WithTriggers                  bool                     // with_triggers：仅返回包含触发器的主机（覆盖 with_monitored_triggers）
-	WithProblemsSuppressed        *bool                    // withProblemsSuppressed：控制是否返回具有被抑制问题的主机
-	EvalType                      int                      // evaltype：标签搜索规则（0 与/或，2 或）
-	Severities                    interface{}              // severities：仅返回包含指定严重性问题的主机，支持单个整数或整数数组
-	Tags                          []map[string]interface{} // tags：仅返回具有指定标签的主机
-	InheritedTags                 *bool                    // inheritedTags：是否要求链接模板也包含指定标签
-	SelectDiscoveries             interface{}              // selectDiscoveries：返回 discoverie 属性，可为 true、"extend"、字段数组或 count
-	SelectDiscoveryData           interface{}              // selectDiscoveryData：返回 discoveryData 属性
-	SelectDiscoveryRule           interface{}              // selectDiscoveryRule：返回 discoveryRule 属性
-	SelectDiscoveryRulePrototype  interface{}              // selectDiscoveryRulePrototype：返回 discoveryRulePrototype 属性
-	SelectGraphs                  interface{}              // selectGraphs：返回 graphs 属性
-	SelectHostDiscovery           interface{}              // selectHostDiscovery：返回 hostDiscovery 属性（已弃用）
-	SelectHostGroups              interface{}              // selectHostGroups：返回 hostgroups 属性
-	SelectHTTPTests               interface{}              // selectHttpTests：返回 httpTests 属性
-	SelectInterfaces              interface{}              // selectInterfaces：返回 interfaces 属性
-	SelectInventory               interface{}              // selectInventory：返回 inventory 属性
-	SelectItems                   interface{}              // selectItems：返回 items 属性
-	SelectMacros                  interface{}              // selectMacros：返回 macros 属性
-	SelectParentTemplates         interface{}              // selectParentTemplates：返回 parentTemplates 属性
-	SelectDashboards              interface{}              // selectDashboards：返回 dashboards 属性
-	SelectTags                    interface{}              // selectTags：返回 tags 属性
-	SelectInheritedTags           interface{}              // selectInheritedTags：返回 inheritedTags 属性
-	SelectTriggers                interface{}              // selectTriggers：返回 triggers 属性
-	SelectValueMaps               interface{}              // selectValueMaps：返回 valuemaps 属性
-	Filter                        map[string]interface{}   // filter：仅返回完全匹配给定筛选条件的主机
-	LimitSelects                  int                      // limitSelects：限制子查询返回的记录数
-	Search                        map[string]interface{}   // search：按 LIKE 模式模糊匹配属性
-	SearchInventory               map[string]interface{}   // searchInventory：按 LIKE 模式匹配清单数据
-	SortField                     interface{}              // sortfield：按 hostid/host/name/status 排序，支持字符串或数组
-	CountOutput                   bool                     // countOutput：返回计数而非详细结果
-	Editable                      bool                     // editable：仅返回当前用户可编辑的主机
-	ExcludeSearch                 bool                     // excludeSearch：对 search 条件执行排除匹配
-	Limit                         int                      // limit：限制返回的主机数量
-	Output                        interface{}              // output：控制输出字段，可为 "extend"、字段数组等
-	PreserveKeys                  bool                     // preservekeys：保持返回结果使用主机 ID 作为 key
-	SearchByAny                   bool                     // searchByAny：search 条件之间使用 OR
-	SearchWildcardsEnabled        bool                     // searchWildcardsEnabled：允许 search 中的通配符
-	SortOrder                     interface{}              // sortorder：排序方向，支持字符串或数组
-	StartSearch                   bool                     // startSearch：将 search 作为前缀匹配
+	GroupIDs                      []string               // groupids：仅返回属于指定主机组的主机
+	DServiceIDs                   []string               // dserviceids：仅返回与指定发现服务相关的主机
+	GraphIDs                      []string               // graphids：仅返回包含指定图形的主机
+	HostIDs                       []string               // hostids：仅返回具有指定主机 ID 的主机
+	HostID                        string                 // hostid：单个主机 ID，用于 host.update
+	HTTPTestIDs                   []string               // httptestids：仅返回包含指定 Web 检查的主机
+	InterfaceIDs                  []string               // interfaceids：仅返回使用指定接口的主机
+	ItemIDs                       []string               // itemids：仅返回包含指定监控项的主机
+	MaintenanceIDs                []string               // maintenanceids：仅返回受指定维护影响的主机
+	MonitoredHosts                bool                   // monitored_hosts：仅返回受监控的主机
+	ProxyIDs                      []string               // proxyids：仅返回由指定代理监控的主机
+	ProxyGroupIDs                 []string               // proxy_groupids：仅返回由指定代理组监控的主机
+	TemplatedHosts                bool                   // templated_hosts：同时返回主机和模板
+	TemplateIDs                   []string               // templateids：仅返回链接到指定模板的主机
+	TriggerIDs                    []string               // triggerids：仅返回包含指定触发器的主机
+	WithItems                     bool                   // with_items：仅返回包含监控项的主机（覆盖 with_monitored_items 和 with_simple_graph_items）
+	WithItemPrototypes            bool                   // with_item_prototypes：仅返回包含监控项原型的主机（覆盖 with_simple_graph_item_prototypes）
+	WithSimpleGraphItemPrototypes bool                   // with_simple_graph_item_prototypes：仅返回包含数值型监控项原型的主机
+	WithGraphs                    bool                   // with_graphs：仅返回包含图形的主机
+	WithGraphPrototypes           bool                   // with_graph_prototypes：仅返回包含图形原型的主机
+	WithHTTPTests                 bool                   // with_httptests：仅返回包含 Web 检查的主机（覆盖 with_monitored_httptests）
+	WithMonitoredHTTPTests        bool                   // with_monitored_httptests：仅返回包含已启用 Web 检查的主机
+	WithMonitoredItems            bool                   // with_monitored_items：仅返回包含已启用监控项的主机（覆盖 with_simple_graph_items）
+	WithMonitoredTriggers         bool                   // with_monitored_triggers：仅返回包含已启用触发器的主机
+	WithSimpleGraphItems          bool                   // with_simple_graph_items：仅返回包含数值型监控项的主机
+	WithTriggers                  bool                   // with_triggers：仅返回包含触发器的主机（覆盖 with_monitored_triggers）
+	WithProblemsSuppressed        *bool                  // withProblemsSuppressed：控制是否返回具有被抑制问题的主机
+	EvalType                      int                    // evaltype：标签搜索规则（0 与/或，2 或）
+	Severities                    interface{}            // severities：仅返回包含指定严重性问题的主机，支持单个整数或整数数组
+	Tags                          []Tag                  // tags：仅返回具有指定标签的主机
+	InheritedTags                 *bool                  // inheritedTags：是否要求链接模板也包含指定标签
+	SelectDiscoveries             interface{}            // selectDiscoveries：返回 discoverie 属性，可为 true、"extend"、字段数组或 count
+	SelectDiscoveryData           interface{}            // selectDiscoveryData：返回 discoveryData 属性
+	SelectDiscoveryRule           interface{}            // selectDiscoveryRule：返回 discoveryRule 属性
+	SelectDiscoveryRulePrototype  interface{}            // selectDiscoveryRulePrototype：返回 discoveryRulePrototype 属性
+	SelectGraphs                  interface{}            // selectGraphs：返回 graphs 属性
+	SelectHostDiscovery           interface{}            // selectHostDiscovery：返回 hostDiscovery 属性（已弃用）
+	SelectHostGroups              interface{}            // selectHostGroups：返回 hostgroups 属性
+	SelectHTTPTests               interface{}            // selectHttpTests：返回 httpTests 属性
+	SelectInterfaces              interface{}            // selectInterfaces：返回 interfaces 属性
+	SelectInventory               interface{}            // selectInventory：返回 inventory 属性
+	SelectItems                   interface{}            // selectItems：返回 items 属性
+	SelectMacros                  interface{}            // selectMacros：返回 macros 属性
+	SelectParentTemplates         interface{}            // selectParentTemplates：返回 parentTemplates 属性
+	SelectDashboards              interface{}            // selectDashboards：返回 dashboards 属性
+	SelectTags                    interface{}            // selectTags：返回 tags 属性
+	SelectInheritedTags           interface{}            // selectInheritedTags：返回 inheritedTags 属性
+	SelectTriggers                interface{}            // selectTriggers：返回 triggers 属性
+	SelectValueMaps               interface{}            // selectValueMaps：返回 valuemaps 属性
+	Filter                        map[string]interface{} // filter：仅返回完全匹配给定筛选条件的主机
+	LimitSelects                  int                    // limitSelects：限制子查询返回的记录数
+	Search                        map[string]interface{} // search：按 LIKE 模式模糊匹配属性
+	SearchInventory               map[string]interface{} // searchInventory：按 LIKE 模式匹配清单数据
+	SortField                     interface{}            // sortfield：按 hostid/host/name/status 排序，支持字符串或数组
+	CountOutput                   bool                   // countOutput：返回计数而非详细结果
+	Editable                      bool                   // editable：仅返回当前用户可编辑的主机
+	ExcludeSearch                 bool                   // excludeSearch：对 search 条件执行排除匹配
+	Limit                         int                    // limit：限制返回的主机数量
+	Output                        interface{}            // output：控制输出字段，可为 "extend"、字段数组等
+	PreserveKeys                  bool                   // preservekeys：保持返回结果使用主机 ID 作为 key
+	SearchByAny                   bool                   // searchByAny：search 条件之间使用 OR
+	SearchWildcardsEnabled        bool                   // searchWildcardsEnabled：允许 search 中的通配符
+	SortOrder                     interface{}            // sortorder：排序方向，支持字符串或数组
+	StartSearch                   bool                   // startSearch：将 search 作为前缀匹配
 }
 
 // BuildParams 将 HostParams 转换为 Zabbix host.get 所需参数
@@ -178,21 +176,8 @@ func (p HostParams) BuildParams() map[string]interface{} {
 		params["severities"] = p.Severities
 	}
 	// For host.get filter tags (only used when TagsToCreate is not set)
-	if len(p.Tags) > 0 && len(p.TagsToCreate) == 0 {
-		tags := make([]map[string]interface{}, 0, len(p.Tags))
-		for _, tag := range p.Tags {
-			if tag == nil {
-				continue
-			}
-			copied := make(map[string]interface{}, len(tag))
-			for k, v := range tag {
-				copied[k] = v
-			}
-			tags = append(tags, copied)
-		}
-		if len(tags) > 0 {
-			params["tags"] = tags
-		}
+	if len(p.Tags) > 0 {
+		params["tags"] = p.Tags
 	}
 	if p.InheritedTags != nil {
 		params["inheritedTags"] = *p.InheritedTags
@@ -367,24 +352,6 @@ func (p HostParams) BuildParams() map[string]interface{} {
 		}
 		if len(interfaces) > 0 {
 			params["interfaces"] = interfaces
-		}
-	}
-	if len(p.TagsReplace) > 0 {
-		params["tags"] = p.TagsReplace
-	} else if len(p.TagsToCreate) > 0 {
-		tags := make([]map[string]interface{}, 0, len(p.TagsToCreate))
-		for _, tag := range p.TagsToCreate {
-			if tag == nil {
-				continue
-			}
-			copied := make(map[string]interface{}, len(tag))
-			for k, v := range tag {
-				copied[k] = v
-			}
-			tags = append(tags, copied)
-		}
-		if len(tags) > 0 {
-			params["tags"] = tags
 		}
 	}
 	if len(p.TemplatesReplace) > 0 {

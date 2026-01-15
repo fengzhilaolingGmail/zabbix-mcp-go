@@ -2,7 +2,7 @@
  * @Author: fengzhilaoling fengzhilaoling@gmail.com
  * @Date: 2025-12-18 11:20:36
  * @LastEditors: fengzhilaoling
- * @LastEditTime: 2026-01-15 10:40:43
+ * @LastEditTime: 2026-01-15 11:14:21
  * @FilePath: \zabbix-mcp-go\handler\host.go
  * @Description: 主机相关功能
  * @Copyright: Copyright (c) 2025 by fengzhilaoling@gmail.com, All Rights Reserved.
@@ -30,7 +30,7 @@ func UpdateHostHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallT
 	interfacesReplace := make([]map[string]interface{}, 0)
 	templatesReplace := make([]map[string]interface{}, 0)
 	templatesClear := make([]map[string]interface{}, 0)
-	tagsReplace := make([]models.Tag, 0)
+	tags := make([]models.Tag, 0)
 	macrosReplace := make([]map[string]interface{}, 0)
 	var inventory map[string]interface{}
 
@@ -134,7 +134,7 @@ func UpdateHostHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallT
 					if m, ok3 := it.(map[string]interface{}); ok3 {
 						tag, _ := m["tag"].(string)
 						value, _ := m["value"].(string)
-						tagsReplace = append(tagsReplace, models.Tag{Tag: tag, Value: value})
+						tags = append(tags, models.Tag{Tag: tag, Value: value})
 					}
 				}
 			}
@@ -182,7 +182,7 @@ func UpdateHostHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallT
 		InterfacesReplace: interfacesReplace,
 		TemplatesReplace:  templatesReplace,
 		TemplatesClear:    templatesClear,
-		TagsReplace:       tagsReplace,
+		Tags:              tags,
 		MacrosReplace:     macrosReplace,
 		Inventory:         inventory,
 	}
@@ -397,7 +397,7 @@ func CreateHostHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallT
 	port := ""
 	groups := []string{}
 	templates := []string{}
-	tags := make([]map[string]interface{}, 0)
+	tags := make([]models.Tag, 0)
 	macros := make([]map[string]interface{}, 0)
 	inventory := make(map[string]interface{})
 	groupMap := make([]map[string]interface{}, 0)
@@ -494,8 +494,16 @@ func CreateHostHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallT
 				}
 			}
 		}
-		if v, ok2 := args["tags"].([]map[string]interface{}); ok2 {
-			tags = v
+		if raw, ok := args["tags"]; ok {
+			if arr, ok2 := raw.([]interface{}); ok2 {
+				for _, it := range arr {
+					if m, ok3 := it.(map[string]interface{}); ok3 {
+						tag, _ := m["tag"].(string)
+						value, _ := m["value"].(string)
+						tags = append(tags, models.Tag{Tag: tag, Value: value})
+					}
+				}
+			}
 		}
 		if v, ok2 := args["macros"].([]map[string]interface{}); ok2 {
 			macros = v
@@ -532,7 +540,7 @@ func CreateHostHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallT
 		Host:           host,
 		Name:           name,
 		Interfaces:     interfaces,
-		TagsToCreate:   tags,
+		Tags:           tags,
 		MacrosToCreate: macros,
 		Inventory:      inventory,
 	}
@@ -644,7 +652,7 @@ func UpdateNewHostHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.Ca
 	case "templates_clear":
 		spec.TemplatesClear = templates
 	case "tags":
-		spec.TagsReplace = tags
+		spec.Tags = tags
 	default:
 		return nil, fmt.Errorf("style %s 不支持", style)
 	}
