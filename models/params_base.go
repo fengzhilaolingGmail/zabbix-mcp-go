@@ -33,3 +33,9 @@ func (m MapParams) BuildParams() map[string]interface{} {
 func (m MapParams) BuildDeleteParams() []string {
 	return []string{}
 }
+
+// tag类型
+type Tag struct {
+	Tag   string `json:"tag"`
+	Value string `json:"value"`
+}

@@ -2,7 +2,7 @@
  * @Author: fengzhilaoling fengzhilaoling@gmail.com
  * @Date: 2025-12-18 11:20:36
  * @LastEditors: fengzhilaoling
- * @LastEditTime: 2026-01-15 10:11:01
+ * @LastEditTime: 2026-01-15 10:40:43
  * @FilePath: \zabbix-mcp-go\handler\host.go
  * @Description: 主机相关功能
  * @Copyright: Copyright (c) 2025 by fengzhilaoling@gmail.com, All Rights Reserved.
@@ -30,7 +30,7 @@ func UpdateHostHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallT
 	interfacesReplace := make([]map[string]interface{}, 0)
 	templatesReplace := make([]map[string]interface{}, 0)
 	templatesClear := make([]map[string]interface{}, 0)
-	tagsReplace := make([]map[string]interface{}, 0)
+	tagsReplace := make([]models.Tag, 0)
 	macrosReplace := make([]map[string]interface{}, 0)
 	var inventory map[string]interface{}
 
@@ -128,17 +128,14 @@ func UpdateHostHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallT
 		}
 
 		// tags 用于替换当前主机标签（tags 或 tags_replace）
-		if arr, ok2 := args["tags"].([]interface{}); ok2 {
-			for _, it := range arr {
-				if m, ok3 := it.(map[string]interface{}); ok3 {
-					tagsReplace = append(tagsReplace, m)
-				}
-			}
-		}
-		if arr, ok2 := args["tags_replace"].([]interface{}); ok2 {
-			for _, it := range arr {
-				if m, ok3 := it.(map[string]interface{}); ok3 {
-					tagsReplace = append(tagsReplace, m)
+		if raw, ok := args["tags"]; ok {
+			if arr, ok2 := raw.([]interface{}); ok2 {
+				for _, it := range arr {
+					if m, ok3 := it.(map[string]interface{}); ok3 {
+						tag, _ := m["tag"].(string)
+						value, _ := m["value"].(string)
+						tagsReplace = append(tagsReplace, models.Tag{Tag: tag, Value: value})
+					}
 				}
 			}
 		}
@@ -568,6 +565,9 @@ func UpdateNewHostHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.Ca
 	hostid := ""
 	groups := []map[string]interface{}{}
 	templates := []map[string]interface{}{}
+	tags := []models.Tag{}
+	// macros := []map[string]interface{}{}
+	// inventory := map[string]interface{}{}
 	style := ""
 	if args, ok := req.Params.Arguments.(map[string]interface{}); ok {
 		if v, ok2 := args["instance"].(string); ok2 {
@@ -613,6 +613,24 @@ func UpdateNewHostHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.Ca
 				}
 			}
 		}
+
+		if raw, ok := args["tags"]; ok {
+			if arr, ok2 := raw.([]interface{}); ok2 {
+				for _, it := range arr {
+					if m, ok3 := it.(map[string]interface{}); ok3 {
+						tag, _ := m["tag"].(string)
+						value, _ := m["value"].(string)
+						tags = append(tags, models.Tag{Tag: tag, Value: value})
+					}
+				}
+			}
+		}
+		// if v, ok2 := args["macros"].([]interface{}); ok2 {
+		// 	macros = v
+		// }
+		// if v, ok2 := args["inventory"].([]interface{}); ok2 {
+		// 	inventory = v
+		// }
 	}
 	logger.L().Infof("groups %v, templates %v", groups, templates)
 	// Build spec using replace semantics for update
@@ -625,6 +643,8 @@ func UpdateNewHostHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.Ca
 		spec.TemplatesReplace = templates
 	case "templates_clear":
 		spec.TemplatesClear = templates
+	case "tags":
+		spec.TagsReplace = tags
 	default:
 		return nil, fmt.Errorf("style %s 不支持", style)
 	}

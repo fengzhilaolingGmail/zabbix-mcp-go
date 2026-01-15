@@ -14,7 +14,7 @@ type HostParams struct {
 	// Replace-time fields (用于 update 替换当前对象，未在请求中列出的将被移除)
 	GroupsReplace     []map[string]interface{} // groups：用于替换主机所属主机组，主机组必须只包含 groupid 字段
 	InterfacesReplace []map[string]interface{} // interfaces：用于替换主机接口，请求中未列出的接口将被移除
-	TagsReplace       []map[string]interface{} // tags：用于替换主机标签，请求中未列出的标签将被移除
+	TagsReplace       []Tag                    // tags：用于替换主机标签，请求中未列出的标签将被移除
 	TemplatesReplace  []map[string]interface{} // templates：用于替换关联模板，模板对象应仅包含 templateid
 	TemplatesClear    []map[string]interface{} // templates_clear：用于从主机中解除并清除模板，模板对象仅包含 templateid
 	MacrosReplace     []map[string]interface{} // macros：用于替换用户宏，请求中未列出的宏将被删除
@@ -370,20 +370,7 @@ func (p HostParams) BuildParams() map[string]interface{} {
 		}
 	}
 	if len(p.TagsReplace) > 0 {
-		tags := make([]map[string]interface{}, 0, len(p.TagsReplace))
-		for _, tag := range p.TagsReplace {
-			if tag == nil {
-				continue
-			}
-			copied := make(map[string]interface{}, len(tag))
-			for k, v := range tag {
-				copied[k] = v
-			}
-			tags = append(tags, copied)
-		}
-		if len(tags) > 0 {
-			params["tags"] = tags
-		}
+		params["tags"] = p.TagsReplace
 	} else if len(p.TagsToCreate) > 0 {
 		tags := make([]map[string]interface{}, 0, len(p.TagsToCreate))
 		for _, tag := range p.TagsToCreate {
