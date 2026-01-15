@@ -2,7 +2,7 @@
  * @Author: fengzhilaoling fengzhilaoling@gmail.com
  * @Date: 2026-01-02 15:33:32
  * @LastEditors: fengzhilaoling
- * @LastEditTime: 2026-01-13 19:46:20
+ * @LastEditTime: 2026-01-15 10:10:40
  * @FilePath: \zabbix-mcp-go\register\host.go
  * @Description: 文件解释
  * Copyright (c) 2026 by fengzhilaoling@gmail.com, All Rights Reserved.
@@ -196,11 +196,31 @@ func registerGetHost(s *server.MCPServer) {
 func registerUpdateHost(s *server.MCPServer) {
 	s.AddTool(
 		mcp.NewTool("update_host_groups",
-			mcp.WithDescription("更新主机属性,添加或删除主机组"),
+			mcp.WithDescription("更新主机的主机组"),
 			mcp.WithString("instance", mcp.Description("Zabbix 实例名称")),
 			mcp.WithString("hostid", mcp.Required(), mcp.Description("主机ID")),
 			mcp.WithArray("groups", mcp.Required(), mcp.Description("主机组ID列表")),
 			mcp.WithString("style", mcp.Required(), mcp.Description("默认:groups 表示更新主机组")),
+		),
+		handler.UpdateNewHostHandler,
+	)
+	s.AddTool(
+		mcp.NewTool("update_host_templates",
+			mcp.WithDescription("更新主机的主机模板"),
+			mcp.WithString("instance", mcp.Description("Zabbix 实例名称")),
+			mcp.WithString("hostid", mcp.Required(), mcp.Description("主机ID")),
+			mcp.WithArray("templates", mcp.Required(), mcp.Description("模板ID列表")),
+			mcp.WithString("style", mcp.Required(), mcp.Description("默认:templates 表示更新主机模板")),
+		),
+		handler.UpdateNewHostHandler,
+	)
+	s.AddTool(
+		mcp.NewTool("clear_host_templates",
+			mcp.WithDescription("清除主机的主机模板(取消模板并清除关联)"),
+			mcp.WithString("instance", mcp.Description("Zabbix 实例名称")),
+			mcp.WithString("hostid", mcp.Required(), mcp.Description("主机ID")),
+			mcp.WithArray("templates", mcp.Required(), mcp.Description("模板ID列表")),
+			mcp.WithString("style", mcp.Required(), mcp.Description("默认:templates_clear 表示清除主机模板")),
 		),
 		handler.UpdateNewHostHandler,
 	)

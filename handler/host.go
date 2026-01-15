@@ -2,7 +2,7 @@
  * @Author: fengzhilaoling fengzhilaoling@gmail.com
  * @Date: 2025-12-18 11:20:36
  * @LastEditors: fengzhilaoling
- * @LastEditTime: 2026-01-13 20:08:13
+ * @LastEditTime: 2026-01-15 10:11:01
  * @FilePath: \zabbix-mcp-go\handler\host.go
  * @Description: 主机相关功能
  * @Copyright: Copyright (c) 2025 by fengzhilaoling@gmail.com, All Rights Reserved.
@@ -481,7 +481,7 @@ func CreateHostHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallT
 			}
 		}
 		// 兼容map格式
-		if arr, ok2 := args["templateids"].([]interface{}); ok2 {
+		if arr, ok2 := args["templates"].([]interface{}); ok2 {
 			for _, it := range arr {
 				if s, ok3 := it.(string); ok3 && s != "" {
 					templateMap = append(templateMap, map[string]interface{}{"templateid": s})
@@ -567,6 +567,7 @@ func UpdateNewHostHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.Ca
 	instanceName := ""
 	hostid := ""
 	groups := []map[string]interface{}{}
+	templates := []map[string]interface{}{}
 	style := ""
 	if args, ok := req.Params.Arguments.(map[string]interface{}); ok {
 		if v, ok2 := args["instance"].(string); ok2 {
@@ -595,14 +596,37 @@ func UpdateNewHostHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.Ca
 				}
 			}
 		}
+		if arr, ok2 := args["templates"].([]interface{}); ok2 {
+			for _, it := range arr {
+				if s, ok3 := it.(string); ok3 && s != "" {
+					templates = append(templates, map[string]interface{}{"templateid": s})
+				}
+			}
+		}
+		if arr, ok2 := args["templates"].([]interface{}); ok2 {
+			for _, it := range arr {
+				if m, ok3 := it.(map[string]interface{}); ok3 {
+					// only keep templateid if present
+					if tid, ok4 := m["templateid"]; ok4 {
+						templates = append(templates, map[string]interface{}{"templateid": tid})
+					}
+				}
+			}
+		}
 	}
-	logger.L().Infof("groups %v", groups)
+	logger.L().Infof("groups %v, templates %v", groups, templates)
 	// Build spec using replace semantics for update
 	spec := models.HostParams{}
 	spec.HostID = hostid
 	switch style {
 	case "groups":
 		spec.GroupsReplace = groups
+	case "templates":
+		spec.TemplatesReplace = templates
+	case "templates_clear":
+		spec.TemplatesClear = templates
+	default:
+		return nil, fmt.Errorf("style %s 不支持", style)
 	}
 	result, err := server.UpdateHost(ctx, clientPool, spec, instanceName)
 	if err != nil {

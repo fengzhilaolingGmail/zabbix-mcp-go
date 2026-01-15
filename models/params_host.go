@@ -12,12 +12,13 @@ type HostParams struct {
 	MacrosToCreate  []map[string]interface{} // macros：用于 host.create，用户宏定义
 	Inventory       map[string]interface{}   // inventory：用于 host.create/update，主机资产清单
 	// Replace-time fields (用于 update 替换当前对象，未在请求中列出的将被移除)
-	GroupsReplace                 []map[string]interface{} // groups：用于替换主机所属主机组，主机组必须只包含 groupid 字段
-	InterfacesReplace             []map[string]interface{} // interfaces：用于替换主机接口，请求中未列出的接口将被移除
-	TagsReplace                   []map[string]interface{} // tags：用于替换主机标签，请求中未列出的标签将被移除
-	TemplatesReplace              []map[string]interface{} // templates：用于替换关联模板，模板对象应仅包含 templateid
-	TemplatesClear                []map[string]interface{} // templates_clear：用于从主机中解除并清除模板，模板对象仅包含 templateid
-	MacrosReplace                 []map[string]interface{} // macros：用于替换用户宏，请求中未列出的宏将被删除
+	GroupsReplace     []map[string]interface{} // groups：用于替换主机所属主机组，主机组必须只包含 groupid 字段
+	InterfacesReplace []map[string]interface{} // interfaces：用于替换主机接口，请求中未列出的接口将被移除
+	TagsReplace       []map[string]interface{} // tags：用于替换主机标签，请求中未列出的标签将被移除
+	TemplatesReplace  []map[string]interface{} // templates：用于替换关联模板，模板对象应仅包含 templateid
+	TemplatesClear    []map[string]interface{} // templates_clear：用于从主机中解除并清除模板，模板对象仅包含 templateid
+	MacrosReplace     []map[string]interface{} // macros：用于替换用户宏，请求中未列出的宏将被删除
+	// ================================
 	GroupIDs                      []string                 // groupids：仅返回属于指定主机组的主机
 	DServiceIDs                   []string                 // dserviceids：仅返回与指定发现服务相关的主机
 	GraphIDs                      []string                 // graphids：仅返回包含指定图形的主机
