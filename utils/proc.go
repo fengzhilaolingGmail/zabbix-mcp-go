@@ -13,6 +13,7 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"math/big"
+	"strconv"
 )
 
 // ToJSON 将任意接口序列化为JSON字节切片（紧凑格式）。
@@ -59,4 +60,23 @@ func GenerateSecurePassword(length int) (string, error) {
 		result[i] = passwordCharset[rnd.Int64()]
 	}
 	return string(result), nil
+}
+
+func JsonInt(v interface{}, def int) int {
+	switch val := v.(type) {
+	case string:
+		if val == "" {
+			return def
+		}
+		if i, err := strconv.Atoi(val); err == nil {
+			return i
+		}
+	case float64:
+		return int(val)
+	case int:
+		return val
+	case int64:
+		return int(val)
+	}
+	return def
 }

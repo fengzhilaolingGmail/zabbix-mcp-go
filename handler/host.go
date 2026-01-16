@@ -2,7 +2,7 @@
  * @Author: fengzhilaoling fengzhilaoling@gmail.com
  * @Date: 2025-12-18 11:20:36
  * @LastEditors: fengzhilaoling
- * @LastEditTime: 2026-01-15 11:14:21
+ * @LastEditTime: 2026-01-16 10:24:59
  * @FilePath: \zabbix-mcp-go\handler\host.go
  * @Description: 主机相关功能
  * @Copyright: Copyright (c) 2025 by fengzhilaoling@gmail.com, All Rights Reserved.
@@ -16,6 +16,7 @@ import (
 	"zabbixMcp/logger"
 	"zabbixMcp/models"
 	"zabbixMcp/server"
+	"zabbixMcp/utils"
 
 	"github.com/mark3labs/mcp-go/mcp"
 )
@@ -574,6 +575,7 @@ func UpdateNewHostHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.Ca
 	groups := []map[string]interface{}{}
 	templates := []map[string]interface{}{}
 	tags := []models.Tag{}
+	interfaces := []models.ZabbixInterface{}
 	// macros := []map[string]interface{}{}
 	// inventory := map[string]interface{}{}
 	style := ""
@@ -621,7 +623,7 @@ func UpdateNewHostHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.Ca
 				}
 			}
 		}
-
+		// tags 兼容AI会传输
 		if raw, ok := args["tags"]; ok {
 			if arr, ok2 := raw.([]interface{}); ok2 {
 				for _, it := range arr {
@@ -633,6 +635,33 @@ func UpdateNewHostHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.Ca
 				}
 			}
 		}
+		// interfaces 兼容AI会传输
+		if raw, ok := args["interfaces"]; ok {
+			if arr, ok2 := raw.([]interface{}); ok2 {
+				for _, it := range arr {
+					if m, ok3 := it.(map[string]interface{}); ok3 {
+						interfaceid := m["interfaceid"].(string)
+						interfaceType := utils.JsonInt(m["type"], 1)
+						hostid := m["hostid"].(string)
+						main := utils.JsonInt(m["main"], 1)
+						useip := utils.JsonInt(m["useip"], 1)
+						ip, _ := m["ip"].(string)
+						dns, _ := m["dns"].(string)
+						port, _ := m["port"].(string)
+						interfaces = append(interfaces, models.ZabbixInterface{
+							InterfaceID: interfaceid,
+							HostID:      hostid,
+							Type:        interfaceType,
+							Main:        main,
+							UseIP:       useip,
+							IP:          ip,
+							DNS:         dns,
+							Port:        port,
+						})
+					}
+				}
+			}
+		}
 		// if v, ok2 := args["macros"].([]interface{}); ok2 {
 		// 	macros = v
 		// }
@@ -640,7 +669,7 @@ func UpdateNewHostHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.Ca
 		// 	inventory = v
 		// }
 	}
-	logger.L().Infof("groups %v, templates %v", groups, templates)
+	logger.L().Infof("groups %v, templates %v, interfaces %v", groups, templates, interfaces)
 	// Build spec using replace semantics for update
 	spec := models.HostParams{}
 	spec.HostID = hostid
@@ -653,6 +682,8 @@ func UpdateNewHostHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.Ca
 		spec.TemplatesClear = templates
 	case "tags":
 		spec.Tags = tags
+	case "interfaces":
+		spec.ZabbixInterfaces = interfaces
 	default:
 		return nil, fmt.Errorf("style %s 不支持", style)
 	}

@@ -16,6 +16,7 @@ type HostParams struct {
 	TemplatesReplace  []map[string]interface{} // templates：用于替换关联模板，模板对象应仅包含 templateid
 	TemplatesClear    []map[string]interface{} // templates_clear：用于从主机中解除并清除模板，模板对象仅包含 templateid
 	MacrosReplace     []map[string]interface{} // macros：用于替换用户宏，请求中未列出的宏将被删除
+	ZabbixInterfaces  []ZabbixInterface
 	// ================================
 	GroupIDs                      []string               // groupids：仅返回属于指定主机组的主机
 	DServiceIDs                   []string               // dserviceids：仅返回与指定发现服务相关的主机
@@ -322,6 +323,9 @@ func (p HostParams) BuildParams() map[string]interface{} {
 		if len(groups) > 0 {
 			params["groups"] = groups
 		}
+	}
+	if len(p.ZabbixInterfaces) > 0 {
+		params["interfaces"] = p.ZabbixInterfaces
 	}
 	if len(p.InterfacesReplace) > 0 {
 		interfaces := make([]map[string]interface{}, 0, len(p.InterfacesReplace))

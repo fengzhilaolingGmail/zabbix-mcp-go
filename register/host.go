@@ -2,7 +2,7 @@
  * @Author: fengzhilaoling fengzhilaoling@gmail.com
  * @Date: 2026-01-02 15:33:32
  * @LastEditors: fengzhilaoling
- * @LastEditTime: 2026-01-15 10:42:05
+ * @LastEditTime: 2026-01-16 09:54:19
  * @FilePath: \zabbix-mcp-go\register\host.go
  * @Description: 文件解释
  * Copyright (c) 2026 by fengzhilaoling@gmail.com, All Rights Reserved.
@@ -11,6 +11,7 @@ package register
 
 import (
 	"zabbixMcp/handler"
+	"zabbixMcp/models"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
@@ -221,6 +222,16 @@ func registerUpdateHost(s *server.MCPServer) {
 			mcp.WithString("hostid", mcp.Required(), mcp.Description("主机ID")),
 			mcp.WithArray("tags", mcp.Required(), mcp.Description("标签列表, 示例: `[{ 'tag': 'tagname', 'value': 'tagvalue' }]`")),
 			mcp.WithString("style", mcp.Required(), mcp.Description("默认:tags 表示更新主机标签")),
+		),
+		handler.UpdateNewHostHandler,
+	)
+	s.AddTool(
+		mcp.NewTool("update_host_interfaces",
+			mcp.WithDescription("更新主机的接口"),
+			mcp.WithString("instance", mcp.Description("Zabbix 实例名称")),
+			mcp.WithString("hostid", mcp.Required(), mcp.Description("主机ID")),
+			mcp.WithArray("interfaces", mcp.Items([]models.ZabbixInterface{}), mcp.Required(), mcp.Description("接口列表")),
+			mcp.WithString("style", mcp.Required(), mcp.Description("默认:interfaces 表示更新主机接口")),
 		),
 		handler.UpdateNewHostHandler,
 	)
