@@ -2,7 +2,7 @@
  * @Author: fengzhilaoling fengzhilaoling@gmail.com
  * @Date: 2026-01-06 19:05:52
  * @LastEditors: fengzhilaoling
- * @LastEditTime: 2026-01-09 15:40:05
+ * @LastEditTime: 2026-01-20 15:42:47
  * @FilePath: \zabbix-mcp-go\register\dashboard.go
  * @Description: 仪表盘注册
  * @Copyright: Copyright (c) 2025 by fengzhilaoling@gmail.com, All Rights Reserved.

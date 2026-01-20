@@ -2,8 +2,8 @@
  * @Author: fengzhilaoling fengzhilaoling@gmail.com
  * @Date: 2026-01-06 18:59:21
  * @LastEditors: fengzhilaoling
- * @LastEditTime: 2026-01-08 17:29:55
- * @FilePath: \zabbix-mcp-go\handler\dashboard.go
+ * @LastEditTime: 2026-01-20 15:58:49
+ * @FilePath: \zabbix-mcp-go\handler\dashboard_graph.go
  * @Description: 仪表盘相关功能
  * @Copyright: Copyright (c) 2025 by fengzhilaoling@gmail.com, All Rights Reserved.
  */
@@ -371,22 +371,37 @@ func buildAggregateModeWidgets(hosts []string, hostNameToID map[string]string, g
 				// 构建映射关系
 				for _, host := range hostList {
 					hostname, _ := host["host"].(string)
-
+					matched := false
+					fuzzyGraphID := ""
+					reqName := ""
 					// 获取该主机的图形列表
 					if graphs, ok := host["graphs"].([]interface{}); ok && len(graphs) > 0 {
 						for _, g := range graphs {
 							if graphMap, ok := g.(map[string]interface{}); ok {
 								graphid, _ := graphMap["graphid"].(string)
 								graphName, _ := graphMap["name"].(string)
-
 								// 检查图形名称是否在请求的列表中（支持模糊匹配）
 								for _, requestedName := range graphNames {
-									if strings.Contains(graphName, requestedName) {
+									if graphName == requestedName {
 										hostGraphMap[hostname][requestedName] = graphid
-										logger.L().Debugf("映射: %s -> %s -> %s", hostname, requestedName, graphid)
-										break
+										logger.L().Infof("完全匹配映射: %s -> %s -> %s", hostname, requestedName, graphid)
+										matched = true
+										break // 完全匹配命中，直接退出遍历
+									}
+									// 2. 未完全匹配时，检查模糊匹配（仅记录第一个候选值，保持原有逻辑）
+									if !matched && strings.Contains(graphName, requestedName) {
+										fuzzyGraphID = graphid
+										reqName = requestedName
 									}
 								}
+								if matched {
+									break
+								}
+							}
+							// 3. 若完全匹配未命中，但有模糊匹配候选值，则处理模糊匹配
+							if !matched && fuzzyGraphID != "" {
+								hostGraphMap[hostname][reqName] = fuzzyGraphID
+								logger.L().Infof("模糊匹配映射: %s -> %s -> %s", hostname, reqName, fuzzyGraphID)
 							}
 						}
 					}
@@ -537,19 +552,35 @@ func buildSeparateModeWidgets(hosts []string, hostNameToID map[string]string, gr
 
 					// 获取该主机的图形列表
 					if graphs, ok := host["graphs"].([]interface{}); ok && len(graphs) > 0 {
+						matched := false
+						fuzzyGraphID := ""
+						reqName := ""
 						for _, g := range graphs {
 							if graphMap, ok := g.(map[string]interface{}); ok {
 								graphid, _ := graphMap["graphid"].(string)
 								graphName, _ := graphMap["name"].(string)
-
 								// 检查图形名称是否在请求的列表中（支持模糊匹配）
 								for _, requestedName := range graphNames {
-									if strings.Contains(graphName, requestedName) {
+									if graphName == requestedName {
 										hostGraphMap[hostname][requestedName] = graphid
-										logger.L().Debugf("映射: %s -> %s -> %s", hostname, requestedName, graphid)
-										break
+										logger.L().Infof("完全匹配映射: %s -> %s -> %s", hostname, requestedName, graphid)
+										matched = true
+										break // 完全匹配命中，直接退出遍历
+									}
+									// 2. 未完全匹配时，检查模糊匹配（仅记录第一个候选值，保持原有逻辑）
+									if !matched && strings.Contains(graphName, requestedName) {
+										fuzzyGraphID = graphid
+										reqName = requestedName
 									}
 								}
+								if matched {
+									break
+								}
+							}
+							// 3. 若完全匹配未命中，但有模糊匹配候选值，则处理模糊匹配
+							if !matched && fuzzyGraphID != "" {
+								hostGraphMap[hostname][reqName] = fuzzyGraphID
+								logger.L().Infof("模糊匹配映射: %s -> %s -> %s", hostname, reqName, fuzzyGraphID)
 							}
 						}
 					}
