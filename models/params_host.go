@@ -8,7 +8,7 @@ type HostParams struct {
 	Interfaces []ZabbixInterface // 主机接口列表
 	HostIds    []string          // 主机id列表
 	Tags       []Tag             // 标签列表
-
+	Templates  []Templates      // 模板列表
 	// 查询参数
 	Filter                 map[string]interface{} // filter：仅返回完全匹配给定筛选条件的主机
 	Output                 interface{}            // output：控制输出字段，可为 "extend"、字段数组等
@@ -101,6 +101,9 @@ func (p HostParams) BuildParams() map[string]interface{} {
 	}
 	if len(p.Interfaces) > 0 {
 		params["interfaces"] = p.Interfaces
+	}
+	if len(p.Templates) > 0 {
+		params["templates"] = p.Templates
 	}
 	// 查询相关参数
 	if p.Search != nil {

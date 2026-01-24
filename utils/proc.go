@@ -2,7 +2,7 @@
  * @Author: fengzhilaoling fengzhilaoling@gmail.com
  * @Date: 2025-12-16 09:41:25
  * @LastEditors: fengzhilaoling
- * @LastEditTime: 2025-12-20 13:58:19
+ * @LastEditTime: 2026-01-24 17:18:31
  * @FilePath: \zabbix-mcp-go\utils\proc.go
  * @Description: 文件详情
  * @Copyright: Copyright (c) 2025 by fengzhilaoling@gmail.com, All Rights Reserved.
@@ -12,6 +12,8 @@ package utils
 import (
 	"crypto/rand"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"math/big"
 	"strconv"
 )
@@ -133,4 +135,50 @@ func handleParsedSlice(slice []string, defaultValue string) interface{} {
 		return defaultValue
 	}
 	return slice
+}
+
+// ParseSliceFromMap 从map[string]interface{}中解析指定key为目标切片类型（泛型版，Go1.18+）
+// 参数：
+//
+//	m: 原始map[string]interface{}（如JSON解析后的args）
+//	key: 要解析的map的key（如"groups"）
+//	target: 目标切片的指针（如&[]models.Groups{}）
+//
+// 返回值：
+//
+//	error: 解析过程中的错误（参数非法/key不存在/序列化/反序列化失败）
+func ParseSliceFromMap(m map[string]interface{}, key string, target interface{}) error {
+	// 1. 校验原始map是否为nil
+	if m == nil {
+		return errors.New("原始map为nil，无法解析")
+	}
+
+	// 2. 校验目标指针是否合法（必须是切片的指针，否则反序列化失败）
+	if target == nil {
+		return errors.New("目标切片指针不能为nil")
+	}
+
+	// 3. 检查map中是否存在指定key
+	val, ok := m[key]
+	if !ok {
+		return fmt.Errorf("map中不存在指定key: %s", key)
+	}
+
+	// 4. 校验key对应值是否为nil（避免Marshal nil导致空值）
+	if val == nil {
+		return fmt.Errorf("key: %s 对应值为nil", key)
+	}
+
+	// 5. 将interface{}序列化为JSON字节流
+	jsonBytes, err := json.Marshal(val)
+	if err != nil {
+		return fmt.Errorf("序列化为JSON失败: %w, key: %s", err, key)
+	}
+
+	// 6. 将JSON字节流反序列化为目标切片类型
+	if err := json.Unmarshal(jsonBytes, target); err != nil {
+		return fmt.Errorf("反序列化为目标类型失败: %w, key: %s", err, key)
+	}
+
+	return nil
 }

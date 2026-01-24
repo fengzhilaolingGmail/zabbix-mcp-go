@@ -27,19 +27,19 @@ type Macros struct {
 
 // ZabbixInterface 主机接口参数
 type ZabbixInterface struct {
-	InterfaceID  string   `json:"interfaceid,comment:接口ID"`                                          // 接口ID.
-	Available    int      `json:"available,omitempty,comment:主机接口的可用性:0(默认)-未知;1-可用;2-不可用"`          // 主机 接口的可用性. 0 - (默认) 未知; 1 - 可用; 2 - 不可用.
-	HostID       string   `json:"hostid,comment:接口所属的主机ID"`                                          // 接口所属的 主机 ID.
-	Type         int      `json:"type,omitempty,comment:接口类型:1-Agent;2-SNMP;3-IPMI;4-JMX"`           // 接口类型. 1 - Agent; 2 - SNMP; 3 - IPMI; 4 - JMX.
-	IP           string   `json:"ip,omitempty,comment:接口使用的IP地址.如果通过DNS连接可以为空."`                     // 接口使用的IP地址. 如果通过DNS连接可以为空.
-	DNS          string   `json:"dns,omitempty,comment:接口使用的DNS名称.如果通过IP连接可以为空."`                    // 接口使用的DNS名称. 如果通过IP连接可以为空.
-	Port         string   `json:"port,omitempty,comment:接口使用的端口号.可包含用户宏."`                           // 接口使用的端口号. 可包含用户宏.
-	UseIP        int      `json:"useip,omitempty,comment:是否应通过IP连接:0-使用主机DNS名称连接;1-使用主机IP地址连接.(默认)"` // 是否应通过IP连接. 0 - 使用 主机DNS名称 连接; 1 - 使用 主机IP地址 连接.(默认)
-	Main         int      `json:"main,omitempty,comment:接口是否作为主机的默认接口:0-非默认;1-默认.(默认)"`              // 接口是否作为 主机 的默认接口. 每种类型只能有一个接口在 一个主机 上设置为默认. 0 - 非默认; 1 - 默认. (默认)
-	Details      []string `json:"details,omitempty,comment:接口的额外详情object."`                          // 接口的额外详情 object.
-	DisableUntil int      `json:"disable_until,omitempty,comment:接口不可用的下次轮询时间.0-默认(立即可用)"`           // 不可用 主机 接口的下次轮询时间.
-	Error        string   `json:"error,omitempty,comment:主机接口不可用时的错误文本."`                            // 当 主机 接口不可用时的错误文本.
-	ErrorsFrom   int      `json:"errors_from,omitempty,comment:主机接口变为不可用的时间."`                       // 主机 接口变为不可用的时间.
+	InterfaceID  string   `json:"interfaceid,omitempty,comment:接口ID"`                       // 接口ID.
+	Available    string   `json:"available,omitempty,comment:主机接口的可用性:0(默认)-未知;1-可用;2-不可用"` // 主机 接口的可用性. 0 - (默认) 未知; 1 - 可用; 2 - 不可用.
+	HostID       string   `json:"hostid,omitempty,comment:接口所属的主机ID"`                       // 接口所属的 主机 ID.
+	Type         string   `json:"type,comment:接口类型:1-Agent;2-SNMP;3-IPMI;4-JMX"`            // 接口类型. 1 - Agent; 2 - SNMP; 3 - IPMI; 4 - JMX.
+	IP           string   `json:"ip,comment:接口使用的IP地址.如果通过DNS连接可以为空."`                      // 接口使用的IP地址. 如果通过DNS连接可以为空.
+	DNS          string   `json:"dns,comment:接口使用的DNS名称.如果通过IP连接可以为空."`                     // 接口使用的DNS名称. 如果通过IP连接可以为空.
+	Port         string   `json:"port,comment:接口使用的端口号.可包含用户宏."`                            // 接口使用的端口号. 可包含用户宏.
+	UseIP        string   `json:"useip,comment:是否应通过IP连接:0-使用主机DNS名称连接;1-使用主机IP地址连接.(默认)"`  // 是否应通过IP连接. 0 - 使用 主机DNS名称 连接; 1 - 使用 主机IP地址 连接.(默认)
+	Main         string   `json:"main,omitempty,comment:接口是否作为主机的默认接口:0-非默认;1-默认.(默认)"`     // 接口是否作为 主机 的默认接口. 每种类型只能有一个接口在 一个主机 上设置为默认. 0 - 非默认; 1 - 默认. (默认)
+	Details      []string `json:"details,omitempty,comment:接口的额外详情object."`                 // 接口的额外详情 object.
+	DisableUntil string   `json:"disable_until,omitempty,comment:接口不可用的下次轮询时间.0-默认(立即可用)"`  // 不可用 主机 接口的下次轮询时间.
+	Error        string   `json:"error,omitempty,comment:主机接口不可用时的错误文本."`                   // 当 主机 接口不可用时的错误文本.
+	ErrorsFrom   string   `json:"errors_from,omitempty,comment:主机接口变为不可用的时间."`              // 主机 接口变为不可用的时间.
 }
 
 // ZabbixTemplate 主机模板参数
