@@ -2,7 +2,7 @@
  * @Author: fengzhilaoling fengzhilaoling@gmail.com
  * @Date: 2025-12-18 11:20:36
  * @LastEditors: fengzhilaoling
- * @LastEditTime: 2026-01-24 15:33:50
+ * @LastEditTime: 2026-01-24 16:10:31
  * @FilePath: \zabbix-mcp-go\handler\host.go
  * @Description: 主机相关功能
  * @Copyright: Copyright (c) 2025 by fengzhilaoling@gmail.com, All Rights Reserved.
@@ -27,6 +27,13 @@ func GetHostForNameHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.C
 	hostname := ""
 	searchWildcardsEnabled := true
 	var selectGraphs interface{}
+	var selectHostGroups interface{}
+	var selectParentTemplates interface{}
+	var selectItems interface{}
+	var selectMacros interface{}
+	var selectTags interface{}
+	var selectTriggers interface{}
+	var selectDashboards interface{}
 	limit := 15
 	limitSelects := 100
 	count := false
@@ -42,44 +49,14 @@ func GetHostForNameHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.C
 		if v, ok2 := args["searchWildcardsEnabled"].(bool); ok2 {
 			searchWildcardsEnabled = v
 		}
-		// selectGraphs 支持两种形式: string "extend"(默认) 或 []string
-		if raw, ok2 := args["selectGraphs"]; ok2 {
-			// 先尝试处理 []interface{} (常见于 JSON 解码)
-			if arr, ok3 := raw.([]interface{}); ok3 {
-				tmp := make([]string, 0, len(arr))
-				for _, it := range arr {
-					if s, ok4 := it.(string); ok4 {
-						tmp = append(tmp, s)
-					}
-				}
-				if len(tmp) == 0 {
-					selectGraphs = "extend"
-				} else {
-					// 如果数组第一个元素为 "extend"，按照 Zabbix API 约定使用字符串 "extend"
-					if tmp[0] == "extend" {
-						selectGraphs = "extend"
-					} else {
-						selectGraphs = tmp
-					}
-				}
-			} else if arrS, ok3 := raw.([]string); ok3 {
-				if len(arrS) == 0 {
-					selectGraphs = "extend"
-				} else {
-					if arrS[0] == "extend" {
-						selectGraphs = "extend"
-					} else {
-						selectGraphs = arrS
-					}
-				}
-			} else if s, ok3 := raw.(string); ok3 {
-				// 允许直接传入字符串 "extend"
-				selectGraphs = s
-			} else {
-				// 未知类型，回退为默认
-				selectGraphs = "extend"
-			}
-		}
+		selectGraphs = utils.ParseZabbixSelectParam(args, "selectGraphs", "extend")
+		selectHostGroups = utils.ParseZabbixSelectParam(args, "selectHostGroups", "extend")
+		selectParentTemplates = utils.ParseZabbixSelectParam(args, "selectParentTemplates", "extend")
+		selectItems = utils.ParseZabbixSelectParam(args, "selectItems", "extend")
+		selectMacros = utils.ParseZabbixSelectParam(args, "selectMacros", "extend")
+		selectTags = utils.ParseZabbixSelectParam(args, "selectTags", "extend")
+		selectTriggers = utils.ParseZabbixSelectParam(args, "selectTriggers", "extend")
+		selectDashboards = utils.ParseZabbixSelectParam(args, "selectDashboards", "extend")
 		if v, ok2 := args["limit"].(int); ok2 {
 			limit = v
 		}
@@ -90,8 +67,12 @@ func GetHostForNameHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.C
 			count = v
 		}
 	}
-	logger.L().Infof("GetHostForNameHandler: instance=%s, hostname=%s, searchWildcardsEnabled=%v, limit=%d", instance, hostname, searchWildcardsEnabled, limit)
-	logger.L().Infof("GetHostForNameHandler: selectGraphs=%v, limitSelects=%d, count=%v", selectGraphs, limitSelects, count)
+	logger.L().Infof("GetHostForNameHandler: instance=%s, hostname=%s, searchWildcardsEnabled=%v, limit=%d",
+		instance, hostname, searchWildcardsEnabled, limit)
+	logger.L().Infof("GetHostForNameHandler: selectGraphs=%v, limitSelects=%d, count=%v, selectHostGroups=%v",
+		selectGraphs, limitSelects, count, selectHostGroups)
+	logger.L().Infof("GetHostForNameHandler: selectParentTemplates=%v, selectItems=%v, selectMacros=%v, selectTags=%v, selectTriggers=%v, selectDashboards=%v",
+		selectParentTemplates, selectItems, selectMacros, selectTags, selectTriggers, selectDashboards)
 	spec := models.HostParams{
 		Output:                 "extend",
 		SelectInterfaces:       "extend",
@@ -100,11 +81,49 @@ func GetHostForNameHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.C
 		LimitSelects:           limitSelects,
 		SearchWildcardsEnabled: searchWildcardsEnabled,
 	}
+	// 不同工具启用不同参数
 	if mcpToolName == "get_graph_by_hostname" {
 		if count {
 			spec.SelectGraphs = "count"
 		} else {
 			spec.SelectGraphs = selectGraphs
+		}
+	}
+	if mcpToolName == "get_groups_by_hostname" {
+		spec.SelectHostGroups = selectHostGroups
+	}
+	if mcpToolName == "get_templates_by_hostname" {
+		if count {
+			spec.SelectParentTemplates = "count"
+		} else {
+			spec.SelectParentTemplates = selectParentTemplates
+		}
+	}
+	if mcpToolName == "get_items_by_hostname" {
+		if count {
+			spec.SelectItems = "count"
+		} else {
+			spec.SelectItems = selectItems
+		}
+	}
+	if mcpToolName == "get_macros_by_hostname" {
+		spec.SelectMacros = selectMacros
+	}
+	if mcpToolName == "get_tags_by_hostname" {
+		spec.SelectTags = selectTags
+	}
+	if mcpToolName == "get_triggers_by_hostname" {
+		if count {
+			spec.SelectTriggers = "count"
+		} else {
+			spec.SelectTriggers = selectTriggers
+		}
+	}
+	if mcpToolName == "get_dashboards_by_hostname" {
+		if count {
+			spec.SelectDashboards = "count"
+		} else {
+			spec.SelectDashboards = selectDashboards
 		}
 	}
 	hosts, err := server.GetHosts(ctx, clientPool, spec, instance)

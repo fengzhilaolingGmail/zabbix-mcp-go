@@ -19,22 +19,23 @@ type HostParams struct {
 	LimitSelects           int                    // limitSelects：限制子查询返回的记录数
 	Limit                  int                    // limit：限制返回的主机数量
 	SelectGraphs           interface{}            // selectGraphs：返回 graphs 属性
+	SelectHostGroups       interface{}            // selectHostGroups：返回 hostgroups 属性
+	SelectParentTemplates  interface{}            // selectParentTemplates：返回 parentTemplates 属性
+	SelectItems            interface{}            // selectItems：返回 items 属性
+	SelectMacros           interface{}            // selectMacros：返回 macros 属性
+	SelectTags             interface{}            // selectTags：返回 tags 属性
+	SelectTriggers         interface{}            // selectTriggers：返回 triggers 属性
+	SelectDashboards       interface{}            // selectDashboards：返回 dashboards 属性
 	// ===============================================
 	// SelectDiscoveries             interface{}            // selectDiscoveries：返回 discoverie 属性，可为 true、"extend"、字段数组或 count
 	// SelectDiscoveryData           interface{}            // selectDiscoveryData：返回 discoveryData 属性
 	// SelectDiscoveryRule           interface{}            // selectDiscoveryRule：返回 discoveryRule 属性
 	// SelectDiscoveryRulePrototype  interface{}            // selectDiscoveryRulePrototype：返回 discoveryRulePrototype 属性
 	// SelectHostDiscovery           interface{}            // selectHostDiscovery：返回 hostDiscovery 属性（已弃用）
-	// SelectHostGroups              interface{}            // selectHostGroups：返回 hostgroups 属性
 	// SelectHTTPTests               interface{}            // selectHttpTests：返回 httpTests 属性
 	// SelectInventory               interface{}            // selectInventory：返回 inventory 属性
-	// SelectItems                   interface{}            // selectItems：返回 items 属性
-	// SelectMacros                  interface{}            // selectMacros：返回 macros 属性
-	// SelectParentTemplates         interface{}            // selectParentTemplates：返回 parentTemplates 属性
-	// SelectDashboards              interface{}            // selectDashboards：返回 dashboards 属性
-	// SelectTags                    interface{}            // selectTags：返回 tags 属性
+
 	// SelectInheritedTags           interface{}            // selectInheritedTags：返回 inheritedTags 属性
-	// SelectTriggers                interface{}            // selectTriggers：返回 triggers 属性
 	// SelectValueMaps               interface{}            // selectValueMaps：返回 valuemaps 属性
 	// Filter                        map[string]interface{} // filter：仅返回完全匹配给定筛选条件的主机
 	// // ================================
@@ -122,6 +123,27 @@ func (p HostParams) BuildParams() map[string]interface{} {
 	}
 	if p.SearchByAny {
 		params["searchByAny"] = p.SearchByAny
+	}
+	if p.SelectHostGroups != nil {
+		params["selectHostGroups"] = p.SelectHostGroups
+	}
+	if p.SelectParentTemplates != nil {
+		params["selectParentTemplates"] = p.SelectParentTemplates
+	}
+	if p.SelectItems != nil {
+		params["selectItems"] = p.SelectItems
+	}
+	if p.SelectMacros != nil {
+		params["selectMacros"] = p.SelectMacros
+	}
+	if p.SelectTags != nil {
+		params["selectTags"] = p.SelectTags
+	}
+	if p.SelectTriggers != nil {
+		params["selectTriggers"] = p.SelectTriggers
+	}
+	if p.SelectDashboards != nil {
+		params["selectDashboards"] = p.SelectDashboards
 	}
 	return params
 }

@@ -80,3 +80,57 @@ func JsonInt(v interface{}, def int) int {
 	}
 	return def
 }
+
+// ParseZabbixSelectParam 解析Zabbix API的select类参数，兼容多类型输入并遵循Zabbix约定
+// params: 原始参数map（通常是JSON解码后的map[string]interface{}）
+// key: 要解析的参数键名（如"selectGraphs"）
+// defaultValue: 解析失败/空值/未知类型时的回退默认值（如"extend"）
+// return: 解析后的结果，类型为interface{}（实际为string或[]string）
+func ParseZabbixSelectParam(params map[string]interface{}, key string, defaultValue string) interface{} {
+	// 1. 从map中获取指定键值，不存在则返回默认值
+	raw, ok := params[key]
+	if !ok {
+		return defaultValue
+	}
+
+	// 2. 处理JSON解码常见的[]interface{}类型（最常用场景）
+	if arr, ok := raw.([]interface{}); ok {
+		tmp := make([]string, 0, len(arr))
+		// 遍历转换为字符串切片，过滤非字符串元素
+		for _, it := range arr {
+			if s, ok := it.(string); ok {
+				tmp = append(tmp, s)
+			}
+		}
+		return handleParsedSlice(tmp, defaultValue)
+	}
+
+	// 3. 处理原生[]string类型
+	if arrS, ok := raw.([]string); ok {
+		return handleParsedSlice(arrS, defaultValue)
+	}
+
+	// 4. 处理直接传入的字符串类型（如直接传"extend"）
+	if s, ok := raw.(string); ok {
+		return s
+	}
+
+	// 5. 未知类型，返回默认值
+	return defaultValue
+}
+
+// handleParsedSlice 处理解析后的字符串切片，遵循Zabbix API约定
+// slice: 解析后的纯字符串切片
+// defaultValue: 空切片时的回退值
+// return: 处理结果（string或[]string）
+func handleParsedSlice(slice []string, defaultValue string) interface{} {
+	// 空切片返回默认值
+	if len(slice) == 0 {
+		return defaultValue
+	}
+	// 首元素为默认值则返回字符串类型，否则返回原切片
+	if slice[0] == defaultValue {
+		return defaultValue
+	}
+	return slice
+}
