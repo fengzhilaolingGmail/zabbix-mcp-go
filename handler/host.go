@@ -2,7 +2,7 @@
  * @Author: fengzhilaoling fengzhilaoling@gmail.com
  * @Date: 2025-12-18 11:20:36
  * @LastEditors: fengzhilaoling
- * @LastEditTime: 2026-01-24 17:33:28
+ * @LastEditTime: 2026-01-26 09:20:28
  * @FilePath: \zabbix-mcp-go\handler\host.go
  * @Description: 主机相关功能
  * @Copyright: Copyright (c) 2025 by fengzhilaoling@gmail.com, All Rights Reserved.
@@ -154,25 +154,66 @@ func CreateHostHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallT
 		if v, ok2 := args["name"].(string); ok2 {
 			name = v
 		}
+		// 解析 groups（支持 []models.Groups 或 []map[string]interface{}）
 		if err := utils.ParseSliceFromMap(args, "groups", &groups); err != nil {
-			// 业务层错误处理（日志+返回/终止）
-			logger.L().Errorf("解析groups失败: %v", err)
-			return nil, fmt.Errorf("解析groups失败: %w", err)
+			if arr, ok2 := args["groups"].([]interface{}); ok2 {
+				for _, v2 := range arr {
+					switch vv := v2.(type) {
+					case string:
+						groups = append(groups, models.Groups{GroupID: vv})
+					case map[string]interface{}:
+						if gid, ok3 := vv["groupid"].(string); ok3 {
+							groups = append(groups, models.Groups{GroupID: gid})
+						}
+					}
+				}
+			}
 		}
+
+		// 解析 templates（支持 []models.Templates 或 []map[string]interface{}）
 		if err := utils.ParseSliceFromMap(args, "templates", &templates); err != nil {
-			// 业务层错误处理（日志+返回/终止）
-			logger.L().Errorf("解析templates失败: %v", err)
-			return nil, fmt.Errorf("解析templates失败: %w", err)
+			if arr, ok2 := args["templates"].([]interface{}); ok2 {
+				for _, v2 := range arr {
+					switch vv := v2.(type) {
+					case string:
+						templates = append(templates, models.Templates{TemplateID: vv})
+					case map[string]interface{}:
+						if tid, ok3 := vv["templateid"].(string); ok3 {
+							templates = append(templates, models.Templates{TemplateID: tid})
+						}
+					}
+				}
+			}
 		}
+		// 解析 tags，支持多种输入格式（[]models.Tag、[]map[string]interface{} 等）
 		if err := utils.ParseSliceFromMap(args, "tags", &tags); err != nil {
-			// 业务层错误处理（日志+返回/终止）
-			logger.L().Errorf("解析tags失败: %v", err)
-			return nil, fmt.Errorf("解析tags失败: %w", err)
+			// 回退到手动解析以保持兼容性
+			if arr, ok2 := args["tags"].([]interface{}); ok2 {
+				for _, v2 := range arr {
+					if m, ok3 := v2.(map[string]interface{}); ok3 {
+						tagStr, _ := m["tag"].(string)
+						valStr, _ := m["value"].(string)
+						tags = append(tags, models.Tag{Tag: tagStr, Value: valStr})
+					}
+				}
+			}
 		}
+
+		// 解析 macros，支持 []models.Macros 或 []map[string]interface{} 等
 		if err := utils.ParseSliceFromMap(args, "macros", &macros); err != nil {
-			// 业务层错误处理（日志+返回/终止）
-			logger.L().Errorf("解析macros失败: %v", err)
-			return nil, fmt.Errorf("解析macros失败: %w", err)
+			if arr, ok2 := args["macros"].([]interface{}); ok2 {
+				for _, v2 := range arr {
+					switch vv := v2.(type) {
+					case string:
+						macros = append(macros, models.Macros{Macro: vv})
+					case map[string]interface{}:
+						macroStr, _ := vv["macro"].(string)
+						valueStr, _ := vv["value"].(string)
+						descStr, _ := vv["description"].(string)
+						macros = append(macros, models.Macros{Macro: macroStr, Value: valueStr, Description: descStr})
+					}
+				}
+			}
 		}
 		if err := utils.ParseSliceFromMap(args, "interfaces", &interfaces); err != nil {
 			// 业务层错误处理（日志+返回/终止）
