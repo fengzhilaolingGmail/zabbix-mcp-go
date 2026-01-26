@@ -133,7 +133,7 @@ func GetHostForNameHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.C
 	return mcp.NewToolResultStructuredOnly(makeResult(hosts)), nil
 }
 
-// CreateHostHandler 创建主机
+// 创建主机
 func CreateHostHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	instanceName := ""
 	host := ""
@@ -373,7 +373,7 @@ func UpdateNewHostHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.Ca
 	return mcp.NewToolResultStructuredOnly(makeResult(result)), nil
 }
 
-// DeleteHostsHandler 删除主机
+// 删除主机
 func DeleteHostsHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	instanceName := ""
 	hostIDs := []string{}
