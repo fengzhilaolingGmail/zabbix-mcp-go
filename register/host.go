@@ -2,7 +2,7 @@
  * @Author: fengzhilaoling fengzhilaoling@gmail.com
  * @Date: 2026-01-02 15:33:32
  * @LastEditors: fengzhilaoling
- * @LastEditTime: 2026-01-24 17:13:09
+ * @LastEditTime: 2026-01-27 19:33:40
  * @FilePath: \zabbix-mcp-go\register\host.go
  * @Description: 文件解释
  * Copyright (c) 2026 by fengzhilaoling@gmail.com, All Rights Reserved.
@@ -150,54 +150,30 @@ func registerGetHost(s *server.MCPServer) {
 
 func registerUpdateHost(s *server.MCPServer) {
 	s.AddTool(
-		mcp.NewTool("update_host_groups",
-			mcp.WithDescription("更新主机的主机组"),
-			mcp.WithString("instance", mcp.Description("Zabbix 实例名称")),
+		mcp.NewTool("update_host",
+			mcp.WithDescription("更新主机"),
+			mcp.WithString("instance", mcp.Required(), mcp.Description("Zabbix 实例名称")),
 			mcp.WithString("hostid", mcp.Required(), mcp.Description("主机ID")),
-			mcp.WithArray("groups", mcp.Required(), mcp.Description("主机组ID列表")),
-			mcp.WithString("style", mcp.Required(), mcp.Description("默认:groups 表示更新主机组")),
+			mcp.WithString("host", mcp.Description("主机技术名,host 字段")),
+			mcp.WithString("name", mcp.Description("主机可见名称")),
+			mcp.WithArray("groups", mcp.Items([]models.Groups{}), mcp.Description("主机组id列表, 示例: `[{ 'groupid': '12345' },{ 'groupid': '67890' }]`")),
+			mcp.WithArray("interfaces", mcp.Items([]models.ZabbixInterface{}), mcp.Description("接口列表")),
+			mcp.WithArray("templates", mcp.Items([]models.Templates{}), mcp.Description("模板ID列表, 示例: `[{ 'templateid': '12345' },{ 'templateid': '67890' }]`")),
+			mcp.WithArray("tags", mcp.Items([]models.Tag{}), mcp.Description("主机标签数组, 示例: `[{ 'tag': 'tagname', 'value': 'tagvalue' },{ 'tag': 'tagname', 'value': 'tagvalue' }]`")),
+			mcp.WithArray("macros", mcp.Description("用户宏数组, 示例: `[{ 'macro': 'macroname', 'value': 'macrovalue', 'description': 'macrodescription' },{ 'macro': 'macroname', 'value': 'macrovalue', 'description': 'macrodescription' }]`")),
+			mcp.WithString("options", mcp.Required(), mcp.Description("更新选项: templates groups tags macros interfaces需要与响应参数保持一致")),
 		),
-		handler.UpdateNewHostHandler,
-	)
-	s.AddTool(
-		mcp.NewTool("update_host_templates",
-			mcp.WithDescription("更新主机的主机模板"),
-			mcp.WithString("instance", mcp.Description("Zabbix 实例名称")),
-			mcp.WithString("hostid", mcp.Required(), mcp.Description("主机ID")),
-			mcp.WithArray("templates", mcp.Required(), mcp.Description("模板ID列表")),
-			mcp.WithString("style", mcp.Required(), mcp.Description("默认:templates 表示更新主机模板")),
-		),
-		handler.UpdateNewHostHandler,
-	)
-	s.AddTool(
-		mcp.NewTool("update_host_tags",
-			mcp.WithDescription("更新主机的标签"),
-			mcp.WithString("instance", mcp.Description("Zabbix 实例名称")),
-			mcp.WithString("hostid", mcp.Required(), mcp.Description("主机ID")),
-			mcp.WithArray("tags", mcp.Required(), mcp.Description("标签列表, 示例: `[{ 'tag': 'tagname', 'value': 'tagvalue' }]`")),
-			mcp.WithString("style", mcp.Required(), mcp.Description("默认:tags 表示更新主机标签")),
-		),
-		handler.UpdateNewHostHandler,
-	)
-	s.AddTool(
-		mcp.NewTool("update_host_interfaces",
-			mcp.WithDescription("更新主机的接口"),
-			mcp.WithString("instance", mcp.Description("Zabbix 实例名称")),
-			mcp.WithString("hostid", mcp.Required(), mcp.Description("主机ID")),
-			mcp.WithArray("interfaces", mcp.Items([]models.ZabbixInterface{}), mcp.Required(), mcp.Description("接口列表")),
-			mcp.WithString("style", mcp.Required(), mcp.Description("默认:interfaces 表示更新主机接口")),
-		),
-		handler.UpdateNewHostHandler,
+		handler.UpdateHostHandler,
 	)
 	s.AddTool(
 		mcp.NewTool("clear_host_templates",
-			mcp.WithDescription("清除主机的主机模板(取消模板并清除关联)"),
-			mcp.WithString("instance", mcp.Description("Zabbix 实例名称")),
+			mcp.WithDescription("清除主机关联的所有模板"),
+			mcp.WithString("instance", mcp.Required(), mcp.Description("Zabbix 实例名称")),
 			mcp.WithString("hostid", mcp.Required(), mcp.Description("主机ID")),
-			mcp.WithArray("templates", mcp.Required(), mcp.Description("模板ID列表")),
-			mcp.WithString("style", mcp.Required(), mcp.Description("默认:templates_clear 表示清除主机模板")),
+			mcp.WithArray("templates", mcp.Items([]models.Templates{}), mcp.Description("模板ID列表, 示例: `[{ 'templateid': '12345' },{ 'templateid': '67890' }]`")),
+			mcp.WithString("options", mcp.Required(), mcp.Description("clear"), mcp.DefaultString("clear")),
 		),
-		handler.UpdateNewHostHandler,
+		handler.UpdateHostHandler,
 	)
 }
 

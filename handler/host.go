@@ -2,7 +2,7 @@
  * @Author: fengzhilaoling fengzhilaoling@gmail.com
  * @Date: 2025-12-18 11:20:36
  * @LastEditors: fengzhilaoling
- * @LastEditTime: 2026-01-26 09:20:28
+ * @LastEditTime: 2026-01-27 19:26:10
  * @FilePath: \zabbix-mcp-go\handler\host.go
  * @Description: 主机相关功能
  * @Copyright: Copyright (c) 2025 by fengzhilaoling@gmail.com, All Rights Reserved.
@@ -135,7 +135,7 @@ func GetHostForNameHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.C
 
 // 创建主机
 func CreateHostHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	instanceName := ""
+	instance := ""
 	host := ""
 	name := ""
 	groups := []models.Groups{}
@@ -146,7 +146,7 @@ func CreateHostHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallT
 	interfaces := []models.ZabbixInterface{}
 	if args, ok := req.Params.Arguments.(map[string]interface{}); ok {
 		if v, ok2 := args["instance"].(string); ok2 {
-			instanceName = v
+			instance = v
 		}
 		if v, ok2 := args["host"].(string); ok2 {
 			host = v
@@ -215,17 +215,17 @@ func CreateHostHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallT
 				}
 			}
 		}
-		if err := utils.ParseSliceFromMap(args, "interfaces", &interfaces); err != nil {
-			// 业务层错误处理（日志+返回/终止）
-			logger.L().Errorf("解析interfaces失败: %v", err)
-			return nil, fmt.Errorf("解析interfaces失败: %w", err)
+		// 仅在参数中存在 interfaces 时才解析，避免当请求中没有该字段时报错
+		if _, has := args["interfaces"]; has {
+			if err := utils.ParseSliceFromMap(args, "interfaces", &interfaces); err != nil {
+				// 业务层错误处理（日志+返回/终止）
+				logger.L().Errorf("解析interfaces失败: %v", err)
+				return nil, fmt.Errorf("解析interfaces失败: %w", err)
+			}
 		}
-		// if v, ok2 := args["inventory"].(map[string]interface{}); ok2 {
-		// 	inventory = v
-		// }
 	}
 	logger.L().Infof("CreateHostHandler: instance=%s, host=%s, name=%s, groups=%v, templates=%v, tags=%v, macros=%v, interfaces=%v",
-		instanceName, host, name, groups, templates, tags, macros, interfaces)
+		instance, host, name, groups, templates, tags, macros, interfaces)
 	if clientPool == nil {
 		return mcp.NewToolResultStructuredOnly(makeResult([]map[string]interface{}{})), nil
 	}
@@ -237,9 +237,8 @@ func CreateHostHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallT
 		Macros:     macros,
 		Groups:     groups,
 		Templates:  templates,
-		// Inventory:  inventory,
 	}
-	result, err := server.CreateHost(ctx, clientPool, spec, instanceName)
+	result, err := server.CreateHost(ctx, clientPool, spec, instance)
 	if err != nil {
 		logger.L().Errorf("调用 host.create 失败: %v", err)
 		return nil, fmt.Errorf("调用 host.create 失败: %w", err)
@@ -247,125 +246,136 @@ func CreateHostHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallT
 	return mcp.NewToolResultStructuredOnly(makeResult(result)), nil
 }
 
-func UpdateNewHostHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	instanceName := ""
-	// hostid := ""
-	groups := []map[string]interface{}{}
-	templates := []map[string]interface{}{}
-	tags := []models.Tag{}
+func UpdateHostHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	instance := ""
+	hostid := ""
+	host := ""
+	name := ""
+	groups := []models.Groups{}
+	templates := []models.Templates{}
+	tags := make([]models.Tag, 0)
+	macros := []models.Macros{}
+	// inventory := make(map[string]interface{})
 	interfaces := []models.ZabbixInterface{}
-	// macros := []map[string]interface{}{}
-	// inventory := map[string]interface{}{}
-	style := ""
+	options := ""
 	if args, ok := req.Params.Arguments.(map[string]interface{}); ok {
 		if v, ok2 := args["instance"].(string); ok2 {
-			instanceName = v
+			instance = v
 		}
-		// if v, ok := args["hostid"].(string); ok && v != "" {
-		// 	hostid = v
-		// }
-		if v, ok := args["style"].(string); ok && v != "" {
-			style = v
+		if v, ok2 := args["hostid"].(string); ok2 {
+			hostid = v
 		}
-		if arr, ok2 := args["groups"].([]interface{}); ok2 {
-			for _, it := range arr {
-				if s, ok3 := it.(string); ok3 && s != "" {
-					groups = append(groups, map[string]interface{}{"groupid": s})
-				}
-			}
+		if v, ok2 := args["name"].(string); ok2 {
+			name = v
 		}
-		if arr, ok2 := args["groups"].([]interface{}); ok2 {
-			for _, it := range arr {
-				if m, ok3 := it.(map[string]interface{}); ok3 {
-					// only keep groupid if present
-					if gid, ok4 := m["groupid"]; ok4 {
-						groups = append(groups, map[string]interface{}{"groupid": gid})
+		if v, ok2 := args["host"].(string); ok2 {
+			host = v
+		}
+		if v, ok2 := args["options"].(string); ok2 {
+			options = v
+		}
+		// 解析 groups（支持 []models.Groups 或 []map[string]interface{}）
+		if err := utils.ParseSliceFromMap(args, "groups", &groups); err != nil {
+			if arr, ok2 := args["groups"].([]interface{}); ok2 {
+				for _, v2 := range arr {
+					switch vv := v2.(type) {
+					case string:
+						groups = append(groups, models.Groups{GroupID: vv})
+					case map[string]interface{}:
+						if gid, ok3 := vv["groupid"].(string); ok3 {
+							groups = append(groups, models.Groups{GroupID: gid})
+						}
 					}
 				}
 			}
 		}
-		if arr, ok2 := args["templates"].([]interface{}); ok2 {
-			for _, it := range arr {
-				if s, ok3 := it.(string); ok3 && s != "" {
-					templates = append(templates, map[string]interface{}{"templateid": s})
-				}
-			}
-		}
-		if arr, ok2 := args["templates"].([]interface{}); ok2 {
-			for _, it := range arr {
-				if m, ok3 := it.(map[string]interface{}); ok3 {
-					// only keep templateid if present
-					if tid, ok4 := m["templateid"]; ok4 {
-						templates = append(templates, map[string]interface{}{"templateid": tid})
+
+		// 解析 templates（支持 []models.Templates 或 []map[string]interface{}）
+		if err := utils.ParseSliceFromMap(args, "templates", &templates); err != nil {
+			if arr, ok2 := args["templates"].([]interface{}); ok2 {
+				for _, v2 := range arr {
+					switch vv := v2.(type) {
+					case string:
+						templates = append(templates, models.Templates{TemplateID: vv})
+					case map[string]interface{}:
+						if tid, ok3 := vv["templateid"].(string); ok3 {
+							templates = append(templates, models.Templates{TemplateID: tid})
+						}
 					}
 				}
 			}
 		}
-		// tags 兼容AI会传输
-		if raw, ok := args["tags"]; ok {
-			if arr, ok2 := raw.([]interface{}); ok2 {
-				for _, it := range arr {
-					if m, ok3 := it.(map[string]interface{}); ok3 {
-						tag, _ := m["tag"].(string)
-						value, _ := m["value"].(string)
-						tags = append(tags, models.Tag{Tag: tag, Value: value})
+		// 解析 tags，支持多种输入格式（[]models.Tag、[]map[string]interface{} 等）
+		if err := utils.ParseSliceFromMap(args, "tags", &tags); err != nil {
+			// 回退到手动解析以保持兼容性
+			if arr, ok2 := args["tags"].([]interface{}); ok2 {
+				for _, v2 := range arr {
+					if m, ok3 := v2.(map[string]interface{}); ok3 {
+						tagStr, _ := m["tag"].(string)
+						valStr, _ := m["value"].(string)
+						tags = append(tags, models.Tag{Tag: tagStr, Value: valStr})
 					}
 				}
 			}
 		}
-		// interfaces 兼容AI会传输
-		if raw, ok := args["interfaces"]; ok {
-			if arr, ok2 := raw.([]interface{}); ok2 {
-				for _, it := range arr {
-					if m, ok3 := it.(map[string]interface{}); ok3 {
-						interfaceid := m["interfaceid"].(string)
-						interfaceType := m["type"].(string)
-						hostid := m["hostid"].(string)
-						main := m["main"].(string)
-						useip := m["useip"].(string)
-						ip, _ := m["ip"].(string)
-						dns, _ := m["dns"].(string)
-						port, _ := m["port"].(string)
-						interfaces = append(interfaces, models.ZabbixInterface{
-							InterfaceID: interfaceid,
-							HostID:      hostid,
-							Type:        interfaceType,
-							Main:        main,
-							UseIP:       useip,
-							IP:          ip,
-							DNS:         dns,
-							Port:        port,
-						})
+
+		// 解析 macros，支持 []models.Macros 或 []map[string]interface{} 等
+		if err := utils.ParseSliceFromMap(args, "macros", &macros); err != nil {
+			if arr, ok2 := args["macros"].([]interface{}); ok2 {
+				for _, v2 := range arr {
+					switch vv := v2.(type) {
+					case string:
+						macros = append(macros, models.Macros{Macro: vv})
+					case map[string]interface{}:
+						macroStr, _ := vv["macro"].(string)
+						valueStr, _ := vv["value"].(string)
+						descStr, _ := vv["description"].(string)
+						macros = append(macros, models.Macros{Macro: macroStr, Value: valueStr, Description: descStr})
 					}
 				}
 			}
 		}
-		// if v, ok2 := args["macros"].([]interface{}); ok2 {
-		// 	macros = v
-		// }
-		// if v, ok2 := args["inventory"].([]interface{}); ok2 {
-		// 	inventory = v
-		// }
+		// 仅在参数中存在 interfaces 时才解析，避免当请求中没有该字段时报错
+		if _, has := args["interfaces"]; has {
+			if err := utils.ParseSliceFromMap(args, "interfaces", &interfaces); err != nil {
+				// 业务层错误处理（日志+返回/终止）
+				logger.L().Errorf("解析interfaces失败: %v", err)
+				return nil, fmt.Errorf("解析interfaces失败: %w", err)
+			}
+		}
 	}
-	logger.L().Infof("groups %v, templates %v, interfaces %v", groups, templates, interfaces)
-	// Build spec using replace semantics for update
-	spec := models.HostParams{}
-	// spec.HostID = hostid
-	switch style {
-	// case "groups":
-	// 	spec.GroupsReplace = groups
-	// case "templates":
-	// 	spec.TemplatesReplace = templates
-	// case "templates_clear":
-	// 	spec.TemplatesClear = templates
-	// case "tags":
-	// 	spec.Tags = tags
-	// case "interfaces":
-	// 	spec.ZabbixInterfaces = interfaces
+	logger.L().Infof("UpdateHostHandler: instance=%s, hostid=%s, host=%s, name=%s, groups=%v, templates=%v",
+		instance, hostid, host, name, groups, templates)
+	logger.L().Infof("UpdateHostHandler: tags=%v, macros=%v, interfaces=%v", tags, macros, interfaces)
+	if clientPool == nil {
+		return mcp.NewToolResultStructuredOnly(makeResult([]map[string]interface{}{})), nil
+	}
+	spec := models.HostParams{
+		HostId: hostid,
+	}
+	if name != "" {
+		spec.Name = name
+	}
+	if host != "" {
+		spec.Host = host
+	}
+	switch options {
+	case "templates":
+		spec.Templates = templates
+	case "groups":
+		spec.Groups = groups
+	case "tags":
+		spec.Tags = tags
+	case "macros":
+		spec.Macros = macros
+	case "interfaces":
+		spec.Interfaces = interfaces
+	case "clear":
+		spec.TemplatesClear = templates
 	default:
-		return nil, fmt.Errorf("style %s 不支持", style)
+		return nil, fmt.Errorf("未知的更新选项: %s", options)
 	}
-	result, err := server.UpdateHost(ctx, clientPool, spec, instanceName)
+	result, err := server.UpdateHost(ctx, clientPool, spec, instance)
 	if err != nil {
 		logger.L().Errorf("调用 host.update 失败: %v", err)
 		return nil, fmt.Errorf("调用 host.update 失败: %w", err)
@@ -375,11 +385,11 @@ func UpdateNewHostHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.Ca
 
 // 删除主机
 func DeleteHostsHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	instanceName := ""
+	instance := ""
 	hostIDs := []string{}
 	if args, ok := req.Params.Arguments.(map[string]interface{}); ok {
 		if v, ok2 := args["instance"].(string); ok2 {
-			instanceName = v
+			instance = v
 		}
 		if arr, ok := args["hostids"].([]string); ok {
 			hostIDs = arr
@@ -391,7 +401,7 @@ func DeleteHostsHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.Call
 		return mcp.NewToolResultStructuredOnly(makeResult([]map[string]interface{}{})), nil
 	}
 	spec := models.HostParams{HostIds: hostIDs}
-	hosts, err := server.DeleteHosts(ctx, clientPool, spec, instanceName)
+	hosts, err := server.DeleteHosts(ctx, clientPool, spec, instance)
 	if err != nil {
 		logger.L().Errorf("调用 host.delete 失败: %w", err)
 		return nil, fmt.Errorf("调用 host.delete 失败: %w", err)

@@ -1,14 +1,16 @@
 package models
 
 type HostParams struct {
-	Host       string            // 技术主机名（必填）
-	Name       string            // 可见名称
-	Groups     []Groups          // 主机组列表
-	Macros     []Macros          // 用户宏列表
-	Interfaces []ZabbixInterface // 主机接口列表
-	HostIds    []string          // 主机id列表
-	Tags       []Tag             // 标签列表
-	Templates  []Templates      // 模板列表
+	Host           string            // 技术主机名（必填）
+	Name           string            // 可见名称
+	Groups         []Groups          // 主机组列表
+	Macros         []Macros          // 用户宏列表
+	Interfaces     []ZabbixInterface // 主机接口列表
+	HostIds        []string          // 主机id列表
+	Tags           []Tag             // 标签列表
+	Templates      []Templates       // 模板列表
+	TemplatesClear []Templates       // 清除模板
+	HostId         string            // 主机id
 	// 查询参数
 	Filter                 map[string]interface{} // filter：仅返回完全匹配给定筛选条件的主机
 	Output                 interface{}            // output：控制输出字段，可为 "extend"、字段数组等
@@ -34,7 +36,6 @@ type HostParams struct {
 	// SelectHostDiscovery           interface{}            // selectHostDiscovery：返回 hostDiscovery 属性（已弃用）
 	// SelectHTTPTests               interface{}            // selectHttpTests：返回 httpTests 属性
 	// SelectInventory               interface{}            // selectInventory：返回 inventory 属性
-
 	// SelectInheritedTags           interface{}            // selectInheritedTags：返回 inheritedTags 属性
 	// SelectValueMaps               interface{}            // selectValueMaps：返回 valuemaps 属性
 	// Filter                        map[string]interface{} // filter：仅返回完全匹配给定筛选条件的主机
@@ -90,6 +91,9 @@ func (p HostParams) BuildParams() map[string]interface{} {
 	if p.Host != "" {
 		params["host"] = p.Host
 	}
+	if p.HostId != "" {
+		params["hostid"] = p.HostId
+	}
 	if p.Name != "" {
 		params["name"] = p.Name
 	}
@@ -104,6 +108,9 @@ func (p HostParams) BuildParams() map[string]interface{} {
 	}
 	if len(p.Templates) > 0 {
 		params["templates"] = p.Templates
+	}
+	if len(p.TemplatesClear) > 0 {
+		params["templates_clear"] = p.TemplatesClear
 	}
 	// 查询相关参数
 	if p.Search != nil {
