@@ -2,7 +2,7 @@
  * @Author: fengzhilaoling fengzhilaoling@gmail.com
  * @Date: 2025-12-18 10:49:35
  * @LastEditors: fengzhilaoling
- * @LastEditTime: 2025-12-22 16:04:23
+ * @LastEditTime: 2026-01-14 13:00:17
  * @FilePath: \zabbix-mcp-go\handler\user.go
  * @Description: 文件详情
  * @Copyright: Copyright (c) 2025 by fengzhilaoling@gmail.com, All Rights Reserved.
@@ -116,8 +116,12 @@ func UpdateUsersHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.Call
 		if v, ok2 := args["name"].(string); ok2 {
 			name = v
 		}
-		if v, ok2 := args["usrgrps"].([]string); ok2 {
-			usrgrps = v
+		if v, ok2 := args["usrgrps"].([]interface{}); ok2 {
+			for _, item := range v {
+				if s, ok := item.(string); ok {
+					usrgrps = append(usrgrps, s)
+				}
+			}
 		}
 		if v, ok2 := args["userid"].(string); ok2 {
 			userid = v
@@ -137,6 +141,7 @@ func UpdateUsersHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.Call
 	if name != "" {
 		spec.Name = name
 	}
+	logger.L().Infof("usrgrps: %v", usrgrps)
 	if len(usrgrps) > 0 {
 		spec.Usrgrps = usrgrps
 	}

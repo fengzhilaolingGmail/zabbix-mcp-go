@@ -2,9 +2,9 @@
  * @Author: fengzhilaoling fengzhilaoling@gmail.com
  * @Date: 2025-12-18 22:03:59
  * @LastEditors: fengzhilaoling
- * @LastEditTime: 2025-12-20 20:22:06
+ * @LastEditTime: 2026-01-24 10:48:29
  * @FilePath: \zabbix-mcp-go\models\params_base.go
- * @Description: 文件解释
+ * @Description: 基础参数模型
  * Copyright (c) 2025 by fengzhilaoling@gmail.com, All Rights Reserved.
  */
 package models
