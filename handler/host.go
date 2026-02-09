@@ -24,7 +24,6 @@ import (
 func GetHostIdsByNamesHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	instance := ""
 	hostnames := []string{}
-	searchWildcardsEnabled := true
 	limit := 50
 	logger.L().Infof("GetHostIdsByNamesHandler: mcpToolName=%s", req.Params.Name)
 	if args, ok := req.Params.Arguments.(map[string]interface{}); ok {
@@ -38,21 +37,17 @@ func GetHostIdsByNamesHandler(ctx context.Context, req mcp.CallToolRequest) (*mc
 				}
 			}
 		}
-		if v, ok2 := args["searchWildcardsEnabled"].(bool); ok2 {
-			searchWildcardsEnabled = v
-		}
 		if v, ok2 := args["limit"].(int); ok2 {
 			limit = v
 		}
 	}
-	logger.L().Infof("GetHostIdsByNamesHandler: hostnames=%v, searchWildcardsEnabled=%v, limit=%v",
-		hostnames, searchWildcardsEnabled, limit)
+	logger.L().Infof("GetHostIdsByNamesHandler: hostnames=%v, limit=%v",
+		hostnames, limit)
 	spec := models.HostParams{
-		Output:                 []string{"hostid", "host", "name"},
-		SelectInterfaces:       "extend",
-		Filter:                 map[string]interface{}{"host": hostnames},
-		Limit:                  limit,
-		SearchWildcardsEnabled: searchWildcardsEnabled,
+		Output:           []string{"hostid", "host", "name"},
+		SelectInterfaces: "extend",
+		Filter:           map[string]interface{}{"host": hostnames},
+		Limit:            limit,
 	}
 	hosts, err := server.GetHosts(ctx, clientPool, spec, instance)
 	if err != nil {
