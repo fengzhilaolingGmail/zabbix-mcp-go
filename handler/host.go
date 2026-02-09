@@ -2,7 +2,7 @@
  * @Author: fengzhilaoling fengzhilaoling@gmail.com
  * @Date: 2025-12-18 11:20:36
  * @LastEditors: fengzhilaoling
- * @LastEditTime: 2026-01-27 19:26:10
+ * @LastEditTime: 2026-02-09 11:11:08
  * @FilePath: \zabbix-mcp-go\handler\host.go
  * @Description: 主机相关功能
  * @Copyright: Copyright (c) 2025 by fengzhilaoling@gmail.com, All Rights Reserved.
@@ -20,6 +20,46 @@ import (
 
 	"github.com/mark3labs/mcp-go/mcp"
 )
+
+func GetHostIdsByNamesHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	instance := ""
+	hostnames := []string{}
+	searchWildcardsEnabled := true
+	limit := 50
+	logger.L().Infof("GetHostIdsByNamesHandler: mcpToolName=%s", req.Params.Name)
+	if args, ok := req.Params.Arguments.(map[string]interface{}); ok {
+		if v, ok2 := args["instance"].(string); ok2 {
+			instance = v
+		}
+		if v, ok2 := args["hostnames"].([]interface{}); ok2 {
+			for _, item := range v {
+				if item2, ok3 := item.(string); ok3 {
+					hostnames = append(hostnames, item2)
+				}
+			}
+		}
+		if v, ok2 := args["searchWildcardsEnabled"].(bool); ok2 {
+			searchWildcardsEnabled = v
+		}
+		if v, ok2 := args["limit"].(int); ok2 {
+			limit = v
+		}
+	}
+	logger.L().Infof("GetHostIdsByNamesHandler: hostnames=%v, searchWildcardsEnabled=%v, limit=%v",
+		hostnames, searchWildcardsEnabled, limit)
+	spec := models.HostParams{
+		Output:                 []string{"hostid", "host", "name"},
+		SelectInterfaces:       "extend",
+		Search:                 map[string]interface{}{"host": hostnames},
+		Limit:                  limit,
+		SearchWildcardsEnabled: searchWildcardsEnabled,
+	}
+	hosts, err := server.GetHosts(ctx, clientPool, spec, instance)
+	if err != nil {
+		return nil, fmt.Errorf("调用 host.get 失败: %w", err)
+	}
+	return mcp.NewToolResultStructuredOnly(makeResult(hosts)), nil
+}
 
 // 通过主机名查询主机信息
 func GetHostForNameHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -66,6 +106,7 @@ func GetHostForNameHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.C
 		if v, ok2 := args["count"].(bool); ok2 {
 			count = v
 		}
+
 	}
 	logger.L().Infof("GetHostForNameHandler: instance=%s, hostname=%s, searchWildcardsEnabled=%v, limit=%d",
 		instance, hostname, searchWildcardsEnabled, limit)
