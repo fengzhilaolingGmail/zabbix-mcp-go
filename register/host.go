@@ -24,7 +24,7 @@ func registerGetHost(s *server.MCPServer) {
 			mcp.WithString("hostname", mcp.Required(), mcp.Description("主机名称")),
 			mcp.WithString("instance", mcp.Required(), mcp.Description("Zabbix实例名称必须填")),
 			mcp.WithBoolean("searchWildcardsEnabled", mcp.Required(), mcp.Description("是否允许通配符搜索,默认: true"), mcp.DefaultBool(true)),
-			mcp.WithNumber("limit", mcp.Required(), mcp.Description("返回主机数量,默认: 15"), mcp.DefaultNumber(15)),
+			mcp.WithNumber("limit", mcp.Required(), mcp.Description("返回主机数量,默认: 50"), mcp.DefaultNumber(50)),
 		),
 		handler.GetHostForNameHandler,
 	)
