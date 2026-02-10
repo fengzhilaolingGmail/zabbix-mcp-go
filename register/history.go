@@ -1,3 +1,12 @@
+/*
+ * @Author: fengzhilaoling fengzhilaoling@gmail.com
+ * @Date: 2026-01-04 11:22:51
+ * @LastEditors: fengzhilaoling
+ * @LastEditTime: 2026-02-09 17:56:11
+ * @FilePath: \zabbix-mcp-go\register\history.go
+ * @Description: 监控历史数据查询
+ * @Copyright: Copyright (c) 2025 by fengzhilaoling@gmail.com, All Rights Reserved.
+ */
 package register
 
 import (
@@ -7,6 +16,7 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 )
 
+// TODO: 完善获取速度优化,开启协程
 func registerHistory(s *server.MCPServer) {
 	s.AddTool(
 		mcp.NewTool("get_history_by_time",

@@ -2,7 +2,7 @@
  * @Author: fengzhilaoling fengzhilaoling@gmail.com
  * @Date: 2025-12-18 11:20:36
  * @LastEditors: fengzhilaoling
- * @LastEditTime: 2026-02-09 13:16:19
+ * @LastEditTime: 2026-02-10 15:59:23
  * @FilePath: \zabbix-mcp-go\handler\host.go
  * @Description: 主机相关功能
  * @Copyright: Copyright (c) 2025 by fengzhilaoling@gmail.com, All Rights Reserved.
@@ -44,10 +44,9 @@ func GetHostIdsByNamesHandler(ctx context.Context, req mcp.CallToolRequest) (*mc
 	logger.L().Infof("GetHostIdsByNamesHandler: hostnames=%v, limit=%v",
 		hostnames, limit)
 	spec := models.HostParams{
-		Output:           []string{"hostid", "host", "name"},
-		SelectInterfaces: "extend",
-		Filter:           map[string]interface{}{"host": hostnames},
-		Limit:            limit,
+		Output: []string{"hostid", "host", "name"},
+		Filter: map[string]interface{}{"host": hostnames},
+		Limit:  limit,
 	}
 	hosts, err := server.GetHosts(ctx, clientPool, spec, instance)
 	if err != nil {
