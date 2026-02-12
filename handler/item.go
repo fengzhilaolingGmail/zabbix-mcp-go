@@ -2,7 +2,7 @@
  * @Author: fengzhilaoling fengzhilaoling@gmail.com
  * @Date: 2026-01-02 16:17:56
  * @LastEditors: fengzhilaoling
- * @LastEditTime: 2026-02-10 19:00:15
+ * @LastEditTime: 2026-02-12 09:43:50
  * @FilePath: \zabbix-mcp-go\handler\item.go
  * @Description: 监控项相关功能
  * Copyright (c) 2026 by fengzhilaoling@gmail.com, All Rights Reserved.
@@ -25,6 +25,8 @@ func GetItemsHandlerNew(ctx context.Context, req mcp.CallToolRequest) (*mcp.Call
 	itemKey := ""
 	itemName := ""
 	toolName := req.Params.Name
+	host := ""
+	hostIds := []string{}
 	logger.L().Infof("GetItemsHandlerNew: mcpToolName=%s", toolName)
 	if args, ok := req.Params.Arguments.(map[string]interface{}); ok {
 		// 解析 instance
@@ -37,9 +39,31 @@ func GetItemsHandlerNew(ctx context.Context, req mcp.CallToolRequest) (*mcp.Call
 		if v, ok := args["item_name"].(string); ok && v != "" {
 			itemName = v
 		}
+		if v, ok := args["host"].(string); ok && v != "" {
+			host = v
+		}
+		if arr, ok := args["hostids"].([]interface{}); ok {
+			for _, v := range arr {
+				if v2, ok2 := v.(string); ok2 {
+					hostIds = append(hostIds, v2)
+				}
+			}
+		}
 	}
+	logger.L().Infof("GetItemsHandlerNew: hostIds=%v, host=%s, itemKey=%s, itemName=%s", hostIds, host, itemKey, itemName)
 	spec := models.ParamsItem{}
+
 	switch {
+	// 根据主机ID和监控项键值查询监控项ID
+	case toolName == "get_hostid_item_from_item_key":
+		if itemKey == "" {
+			return nil, fmt.Errorf("item_key 参数不能为空")
+		}
+		spec.Search = make(map[string]interface{})
+		spec.Search["key_"] = itemKey
+		spec.SearchWildcardsEnabled = true
+		spec.HostIDs = hostIds
+	// 根据主机ID和监控项键值查询监控项ID
 	case toolName == "get_host_item_from_item_key":
 		if itemKey == "" {
 			return nil, fmt.Errorf("item_key 参数不能为空")
@@ -47,6 +71,17 @@ func GetItemsHandlerNew(ctx context.Context, req mcp.CallToolRequest) (*mcp.Call
 		spec.Search = make(map[string]interface{})
 		spec.Search["key_"] = itemKey
 		spec.SearchWildcardsEnabled = true
+		spec.Host = host
+	// 根据主机ID和监控项名称查询监控项ID
+	case toolName == "get_hostid_item_from_item_name":
+		if itemName == "" {
+			return nil, fmt.Errorf("item_name 参数不能为空")
+		}
+		spec.Search = make(map[string]interface{})
+		spec.Search["name"] = itemName
+		spec.SearchWildcardsEnabled = true
+		spec.HostIDs = hostIds
+	// 根据主机名和监控项名称查询监控项ID
 	case toolName == "get_host_item_from_item_name":
 		if itemName == "" {
 			return nil, fmt.Errorf("item_name 参数不能为空")
@@ -54,6 +89,7 @@ func GetItemsHandlerNew(ctx context.Context, req mcp.CallToolRequest) (*mcp.Call
 		spec.Search = make(map[string]interface{})
 		spec.Search["name"] = itemName
 		spec.SearchWildcardsEnabled = true
+		spec.Host = host
 	}
 	items, err := server.GetItems(ctx, clientPool, spec, instance)
 	if err != nil {

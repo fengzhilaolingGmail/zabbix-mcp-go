@@ -2,7 +2,7 @@
  * @Author: fengzhilaoling fengzhilaoling@gmail.com
  * @Date: 2026-01-02 16:33:29
  * @LastEditors: fengzhilaoling
- * @LastEditTime: 2026-02-10 17:38:11
+ * @LastEditTime: 2026-02-12 09:50:37
  * @FilePath: \zabbix-mcp-go\register\item.go
  * @Description: mcp注册监控项相关工具
  * Copyright (c) 2026 by fengzhilaoling@gmail.com, All Rights Reserved.
@@ -30,7 +30,7 @@ func registerItem(s *server.MCPServer) {
 		handler.GetItemsHandler,
 	)
 	s.AddTool(
-		mcp.NewTool("get_host_item_from_item_key",
+		mcp.NewTool("get_hostid_item_from_item_key",
 			mcp.WithDescription("根据主机id和监控项 KEY 查主机监控项"),
 			mcp.WithString("instance", mcp.Required(), mcp.Description("Zabbix实例名称必须填")),
 			mcp.WithArray("host_ids", mcp.Required(), mcp.Description("主机ID列表")),
@@ -39,10 +39,28 @@ func registerItem(s *server.MCPServer) {
 		handler.GetItemsHandlerNew,
 	)
 	s.AddTool(
-		mcp.NewTool("get_host_item_from_item_name",
+		mcp.NewTool("get_hostid_item_from_item_name",
 			mcp.WithDescription("根据主机id和监控项 NAME 查主机监控项"),
 			mcp.WithString("instance", mcp.Required(), mcp.Description("Zabbix实例名称必须填")),
 			mcp.WithArray("host_ids", mcp.Required(), mcp.Description("主机ID列表")),
+			mcp.WithString("item_name", mcp.Description("监控项名称(name),需要使用通配符")),
+		),
+		handler.GetItemsHandlerNew,
+	)
+	s.AddTool(
+		mcp.NewTool("get_host_item_from_item_key",
+			mcp.WithDescription("根据主机名和监控项 KEY 查主机监控项"),
+			mcp.WithString("instance", mcp.Required(), mcp.Description("Zabbix实例名称必须填")),
+			mcp.WithArray("host", mcp.Required(), mcp.Description("主机名称")),
+			mcp.WithString("item_key", mcp.Description("监控项键(key)")),
+		),
+		handler.GetItemsHandlerNew,
+	)
+	s.AddTool(
+		mcp.NewTool("get_host_item_from_item_name",
+			mcp.WithDescription("根据主机名和监控项 NAME 查主机监控项"),
+			mcp.WithString("instance", mcp.Required(), mcp.Description("Zabbix实例名称必须填")),
+			mcp.WithArray("host", mcp.Required(), mcp.Description("主机名称")),
 			mcp.WithString("item_name", mcp.Description("监控项名称(name),需要使用通配符")),
 		),
 		handler.GetItemsHandlerNew,

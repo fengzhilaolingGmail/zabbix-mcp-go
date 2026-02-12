@@ -2,7 +2,7 @@
  * @Author: fengzhilaoling fengzhilaoling@gmail.com
  * @Date: 2025-12-18 11:20:36
  * @LastEditors: fengzhilaoling
- * @LastEditTime: 2026-02-10 15:59:23
+ * @LastEditTime: 2026-02-12 10:40:19
  * @FilePath: \zabbix-mcp-go\handler\host.go
  * @Description: 主机相关功能
  * @Copyright: Copyright (c) 2025 by fengzhilaoling@gmail.com, All Rights Reserved.
@@ -24,8 +24,10 @@ import (
 func GetHostIdsByNamesHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	instance := ""
 	hostnames := []string{}
-	limit := 50
-	logger.L().Infof("GetHostIdsByNamesHandler: mcpToolName=%s", req.Params.Name)
+	hostname := ""
+	limit := 200
+	toolName := req.Params.Name
+	logger.L().Infof("GetHostIdsByNamesHandler: mcpToolName=%s", toolName)
 	if args, ok := req.Params.Arguments.(map[string]interface{}); ok {
 		if v, ok2 := args["instance"].(string); ok2 {
 			instance = v
@@ -40,13 +42,21 @@ func GetHostIdsByNamesHandler(ctx context.Context, req mcp.CallToolRequest) (*mc
 		if v, ok2 := args["limit"].(int); ok2 {
 			limit = v
 		}
+		if v, ok2 := args["hostname"].(string); ok2 {
+			hostname = v
+		}
 	}
-	logger.L().Infof("GetHostIdsByNamesHandler: hostnames=%v, limit=%v",
-		hostnames, limit)
+	logger.L().Infof("GetHostIdsByNamesHandler: hostnames=%v, limit=%v, hostname=%v", hostnames, limit, hostname)
 	spec := models.HostParams{
 		Output: []string{"hostid", "host", "name"},
-		Filter: map[string]interface{}{"host": hostnames},
 		Limit:  limit,
+	}
+	switch {
+	case toolName == "exact_hostname_to_hostid":
+		spec.Filter = map[string]interface{}{"host": hostnames}
+	case toolName == "fuzzy_hostname_to_hostid":
+		spec.Search = map[string]interface{}{"host": hostname}
+		spec.SearchWildcardsEnabled = true
 	}
 	hosts, err := server.GetHosts(ctx, clientPool, spec, instance)
 	if err != nil {
