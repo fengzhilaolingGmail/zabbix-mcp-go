@@ -23,16 +23,16 @@ func registerGetHost(s *server.MCPServer) {
 			mcp.WithDescription("某zabbix实例完整匹配主机名(支持多个)获取主机 ID"),
 			mcp.WithArray("hostnames", mcp.Required(), mcp.Items([]string{"string"}), mcp.Description("主机名称字符串数组")),
 			mcp.WithString("instance", mcp.Required(), mcp.Description("Zabbix实例名称必须填")),
-			mcp.WithNumber("limit", mcp.Required(), mcp.Description("返回主机数量,默认: 50"), mcp.DefaultNumber(200)),
+			mcp.WithNumber("limit", mcp.Required(), mcp.Description("返回主机数量,默认: 200"), mcp.DefaultNumber(200)),
 		),
 		handler.GetHostIdsByNamesHandler,
 	)
 	s.AddTool(
 		mcp.NewTool("fuzzy_hostname_to_hostid",
-			mcp.WithDescription("某zabbix实例模糊主机名查询主机id"),
+			mcp.WithDescription("某zabbix实例模糊主机名(需要使用通配符)查询主机id"),
 			mcp.WithString("hostname", mcp.Required(), mcp.Description("主机名称")),
 			mcp.WithString("instance", mcp.Required(), mcp.Description("Zabbix实例名称必须填")),
-			mcp.WithNumber("limit", mcp.Required(), mcp.Description("返回主机数量,默认: 50"), mcp.DefaultNumber(200)),
+			mcp.WithNumber("limit", mcp.Required(), mcp.Description("返回主机数量,默认: 200"), mcp.DefaultNumber(200)),
 		),
 		handler.GetHostIdsByNamesHandler,
 	)
