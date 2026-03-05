@@ -2,7 +2,7 @@
  * @Author: fengzhilaoling fengzhilaoling@gmail.com
  * @Date: 2026-01-02 15:33:32
  * @LastEditors: fengzhilaoling
- * @LastEditTime: 2026-01-27 19:33:40
+ * @LastEditTime: 2026-02-12 10:27:42
  * @FilePath: \zabbix-mcp-go\register\host.go
  * @Description: 文件解释
  * Copyright (c) 2026 by fengzhilaoling@gmail.com, All Rights Reserved.
@@ -19,12 +19,30 @@ import (
 
 func registerGetHost(s *server.MCPServer) {
 	s.AddTool(
+		mcp.NewTool("exact_hostname_to_hostid",
+			mcp.WithDescription("某zabbix实例完整匹配主机名(支持多个)获取主机 ID"),
+			mcp.WithArray("hostnames", mcp.Required(), mcp.Items([]string{"string"}), mcp.Description("主机名称字符串数组")),
+			mcp.WithString("instance", mcp.Required(), mcp.Description("Zabbix实例名称必须填")),
+			mcp.WithNumber("limit", mcp.Required(), mcp.Description("返回主机数量,默认: 200"), mcp.DefaultNumber(200)),
+		),
+		handler.GetHostIdsByNamesHandler,
+	)
+	s.AddTool(
+		mcp.NewTool("fuzzy_hostname_to_hostid",
+			mcp.WithDescription("某zabbix实例模糊主机名(需要使用通配符)查询主机id"),
+			mcp.WithString("hostname", mcp.Required(), mcp.Description("主机名称")),
+			mcp.WithString("instance", mcp.Required(), mcp.Description("Zabbix实例名称必须填")),
+			mcp.WithNumber("limit", mcp.Required(), mcp.Description("返回主机数量,默认: 200"), mcp.DefaultNumber(200)),
+		),
+		handler.GetHostIdsByNamesHandler,
+	)
+	s.AddTool(
 		mcp.NewTool("get_host_by_name",
 			mcp.WithDescription("获取实例Zabbix主机信息,支持通配符"),
-			mcp.WithString("hostname", mcp.Required(), mcp.Description("主机名称列表")),
+			mcp.WithString("hostname", mcp.Required(), mcp.Description("主机名称")),
 			mcp.WithString("instance", mcp.Required(), mcp.Description("Zabbix实例名称必须填")),
 			mcp.WithBoolean("searchWildcardsEnabled", mcp.Required(), mcp.Description("是否允许通配符搜索,默认: true"), mcp.DefaultBool(true)),
-			mcp.WithNumber("limit", mcp.Required(), mcp.Description("返回主机数量,默认: 15"), mcp.DefaultNumber(15)),
+			mcp.WithNumber("limit", mcp.Required(), mcp.Description("返回主机数量,默认: 50"), mcp.DefaultNumber(50)),
 		),
 		handler.GetHostForNameHandler,
 	)

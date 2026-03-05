@@ -2,7 +2,7 @@
  * @Author: fengzhilaoling fengzhilaoling@gmail.com
  * @Date: 2026-01-04 10:56:53
  * @LastEditors: fengzhilaoling
- * @LastEditTime: 2026-01-05 11:27:58
+ * @LastEditTime: 2026-02-09 14:38:53
  * @FilePath: \zabbix-mcp-go\handler\history.go
  * @Description: 历史数据相关功能
  * @Copyright: Copyright (c) 2025 by fengzhilaoling@gmail.com, All Rights Reserved.
@@ -63,12 +63,37 @@ func parseDurationString(s string) (int64, error) {
 	return total, nil
 }
 
+func loadShanghaiLocation() (*time.Location, error) {
+	// 1. 尝试标准Linux/Mac时区名称
+	loc, err := time.LoadLocation("Asia/Shanghai")
+	if err == nil {
+		return loc, nil
+	}
+
+	// 2. 兼容Windows系统时区名称
+	loc, err = time.LoadLocation("China Standard Time")
+	if err == nil {
+		return loc, nil
+	}
+
+	// 3. 终极兜底：创建UTC+8固定时区，完全不依赖系统时区文件
+	loc = time.FixedZone("CST-8", 8*3600)
+	return loc, nil
+}
+
 // parseTimeParam 支持整型/浮点数时间戳或字符串时间（RFC3339, "2006-01-02 15:04:05",
 // 以及常见的带/不带前导零的日期格式，例如 "2026-1-2 15:00:00" 或 "2026/1/2 15:00:00"）。
 // 返回 Unix 秒数。需要传入时区 location，用于解析无时区的时间字符串以及获取当前时间计算相对时间时使用。
 func parseTimeParam(v interface{}, loc *time.Location) (int, error) {
 	if v == nil {
 		return 0, nil
+	}
+	if loc == nil {
+		var err error
+		loc, err = loadShanghaiLocation()
+		if err != nil {
+			return 0, fmt.Errorf("loc is nil and load shanghai location failed: %w", err)
+		}
 	}
 	switch tv := v.(type) {
 	case float64:

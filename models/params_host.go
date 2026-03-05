@@ -155,6 +155,9 @@ func (p HostParams) BuildParams() map[string]interface{} {
 	if p.SelectDashboards != nil {
 		params["selectDashboards"] = p.SelectDashboards
 	}
+	if p.Filter != nil {
+		params["filter"] = p.Filter
+	}
 	return params
 }
 
