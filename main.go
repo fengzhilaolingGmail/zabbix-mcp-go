@@ -12,6 +12,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"strings"
 	"zabbixMcp/handler"
 	lg "zabbixMcp/logger"
 	"zabbixMcp/register"
@@ -23,10 +24,15 @@ import (
 func main() {
 	// 定义命令行参数
 	var (
-		stdioMode = flag.Bool("stdio", false, "使用stdio传输方式")
-		httpMode  = flag.Bool("http", false, "使用HTTP/SSE传输方式")
-		port      = flag.Int("port", 5443, "HTTP/SSE监听端口")
-		level     = flag.String("loglevel", "info", "日志等级 (debug, info, warn, error, panic, fatal)")
+		stdioMode     = flag.Bool("stdio", false, "使用stdio传输方式")
+		httpMode      = flag.Bool("http", false, "使用HTTP Streamable传输方式")
+		sseMode       = flag.Bool("sse", false, "使用HTTP SSE传输方式")
+		port          = flag.Int("port", 5443, "HTTP Streamable监听端口")
+		ssePort       = flag.Int("sse-port", 5444, "HTTP SSE监听端口")
+		httpTransport = flag.String("http-transport", "streamable", "[兼容参数] HTTP传输类型: streamable 或 sse")
+		httpEndpoint  = flag.String("http-endpoint", "/mcp", "streamable-http 端点路径")
+		httpStateless = flag.Bool("http-stateless", true, "streamable-http 是否使用无状态会话")
+		level         = flag.String("loglevel", "info", "日志等级 (debug, info, warn, error, panic, fatal)")
 	)
 	flag.Parse()
 	// 初始化日志
@@ -66,37 +72,77 @@ func main() {
 	register.Registers(s)
 	lg.L().Info("工具注册完成")
 
-	// 根据参数选择传输方式
+	// 兼容旧参数：-http -http-transport=sse 等价于 -sse
+	if *httpMode && strings.EqualFold(strings.TrimSpace(*httpTransport), "sse") {
+		*sseMode = true
+		*httpMode = false
+	}
+
+	// 若未显式指定模式，默认同时启动三种方式
+	if !*stdioMode && !*httpMode && !*sseMode {
+		*stdioMode = true
+		*httpMode = true
+		*sseMode = true
+	}
+
+	// 端口冲突检查（仅在同时启用 HTTP 与 SSE 时）
+	if *httpMode && *sseMode && *port == *ssePort {
+		lg.L().Fatalf("HTTP Streamable 端口(%d)与 SSE 端口(%d)冲突，请通过 -port/-sse-port 调整", *port, *ssePort)
+	}
+
+	// 启动 HTTP Streamable
+	if *httpMode {
+		go startStreamableHTTPServer(s, *port, *httpEndpoint, *httpStateless)
+	}
+
+	// 启动 SSE
+	if *sseMode {
+		go startSSEServer(s, *ssePort)
+	}
+
+	// 启动 stdio（阻塞）
 	if *stdioMode {
-		// 启动stdio服务器
 		lg.L().Info("启动stdio传输方式的MCP服务器...")
 		if err := server.ServeStdio(s); err != nil {
 			lg.L().Fatalf("stdio服务器启动失败: %v", err)
 		}
-	} else if *httpMode {
-		// 启动HTTP/SSE服务器
-		startHTTPServer(s, *port)
 	} else {
-		// 默认同时启动两种方式（在不同的goroutine中）
-		lg.L().Info("同时启动stdio和HTTP/SSE传输方式的MCP服务器...")
-
-		// 在后台启动HTTP服务器
-		go startHTTPServer(s, *port)
-
-		// 在主线程启动stdio服务器
-		if err := server.ServeStdio(s); err != nil {
-			lg.L().Fatalf("stdio服务器启动失败: %v", err)
-		}
+		// 无 stdio 时阻塞主线程，保持 HTTP/SSE 服务存活
+		lg.L().Info("stdio 未启用，服务将以 HTTP/SSE 模式持续运行")
+		select {}
 	}
 }
 
-// startHTTPServer 启动HTTP传输服务器（使用SSE）
-func startHTTPServer(s *server.MCPServer, port int) {
+// startStreamableHTTPServer 启动 HTTP Streamable 传输服务器
+func startStreamableHTTPServer(s *server.MCPServer, port int, endpoint string, stateless bool) {
+	addr := fmt.Sprintf(":%d", port)
+	normalizedEndpoint := strings.TrimSpace(endpoint)
+	if normalizedEndpoint == "" {
+		normalizedEndpoint = "/mcp"
+	}
+	if !strings.HasPrefix(normalizedEndpoint, "/") {
+		normalizedEndpoint = "/" + normalizedEndpoint
+	}
+
+	lg.L().Infof("启动HTTP/Streamable传输服务器，监听端口: %d", port)
+	lg.L().Infof("MCP端点: http://localhost:%d%s", port, normalizedEndpoint)
+	lg.L().Infof("Streamable会话模式: stateless=%v", stateless)
+
+	httpServer := server.NewStreamableHTTPServer(
+		s,
+		server.WithEndpointPath(normalizedEndpoint),
+		server.WithStateLess(stateless),
+	)
+	if err := httpServer.Start(addr); err != nil {
+		lg.L().Fatalf("HTTP/Streamable服务器启动失败: %v", err)
+	}
+}
+
+// startSSEServer 启动 HTTP SSE 传输服务器
+func startSSEServer(s *server.MCPServer, port int) {
 	addr := fmt.Sprintf(":%d", port)
 	lg.L().Infof("启动HTTP/SSE传输服务器，监听端口: %d", port)
-	lg.L().Infof("MCP端点: http://localhost:%d", port)
-
-	// 使用v0.9.0版本支持的API：创建SSE服务器
+	lg.L().Infof("SSE端点: http://localhost:%d/sse", port)
 	sseServer := server.NewSSEServer(s)
 	if err := sseServer.Start(addr); err != nil {
 		lg.L().Fatalf("HTTP/SSE服务器启动失败: %v", err)

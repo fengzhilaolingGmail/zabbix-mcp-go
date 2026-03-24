@@ -68,19 +68,28 @@ instances:
 go mod tidy
 
 # 构建
-+go build -o zabbixMcp.exe
+go build -o zabbixMcp.exe
 
 # 以 stdio 模式运行（适合集成至编辑器插件）
 ./zabbixMcp.exe -stdio
 
-# 以 HTTP/SSE 模式启动（默认端口 5443）
-./zabbixMcp.exe -http -port 5443 -loglevel debug
+# 以 HTTP Streamable 模式启动（Open Web / MCP HTTP 客户端推荐）
+./zabbixMcp.exe -http -port 5443 -http-endpoint /mcp -http-stateless=true -loglevel debug
+
+# 以 HTTP SSE 模式启动（兼容旧客户端）
+./zabbixMcp.exe -sse -sse-port 5444 -loglevel debug
+
+# 同时启动三种方式（stdio + streamable + sse）
+./zabbixMcp.exe -stdio -http -sse -port 5443 -sse-port 5444 -http-endpoint /mcp -http-stateless=true -loglevel debug
+
+# 不带参数启动：默认也会同时启动三种方式
+./zabbixMcp.exe
 ```
 
 程序启动后会：
 1. 读取 `config.yml`、初始化客户端池并检测版本；
 2. 创建 MCP Server，并注册全部工具；
-3. 根据命令行参数选择 stdio / HTTP / 双通道运行方式。
+3. 根据命令行参数选择并启动 `stdio` / `HTTP Streamable` / `HTTP SSE`（可单独或组合）。
 
 ## 🧪 开发与调试
 
@@ -89,7 +98,7 @@ go mod tidy
 go test ./...
 
 # gofmt 格式化
-+gofmt -w ./handler ./models ./server ./zabbix
+gofmt -w ./handler ./models ./server ./zabbix
 ```
 
 ### 日志定位
@@ -100,15 +109,27 @@ go test ./...
 
 > 以下示例均以 Windows 为例，路径可按需替换为自己的工作目录或用户目录。
 
-#### Cursor（支持 stdio / SSE 双模式）
+#### Cursor（支持 stdio / Streamable / SSE）
 
-1. 根据需要添加下列配置sse模式：
+1. 推荐 Streamable HTTP（Open Web 等客户端优先）：
 
 ``` |
 {
   "mcpServers": {
     "zabbix": {
-      "url": "http://localhost:5443/sse"
+      "url": "http://localhost:5443/mcp"
+    }
+  }
+}
+```
+
+2. 如客户端仅支持 SSE，可使用：
+
+``` |
+{
+  "mcpServers": {
+    "zabbix": {
+      "url": "http://localhost:5444/sse"
     }
   }
 }
@@ -123,7 +144,7 @@ go test ./...
 {
   "mcpServers": {
     "zabbix": {
-      "url": "http://localhost:5443/sse"
+      "url": "http://localhost:5443/mcp"
     }
   }
 }
